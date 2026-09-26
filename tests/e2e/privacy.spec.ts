@@ -32,3 +32,16 @@ for (const mode of ['worker', 'main-thread fallback'] as const) {
     expect(external).toEqual([]);
   });
 }
+
+test('3D garment + cloth physics assets load locally and nothing leaves localhost', async ({ page }) => {
+  const external = watchExternal(page);
+  const local: string[] = [];
+  page.on('request', (r) => local.push(new URL(r.url()).pathname));
+  await openApp(page, { motion: 'cloth' });
+  await waitForTracker(page);
+  await openFile(page, join(FIXTURES, 'synthetic-pattern.webm'));
+  await expect.poll(() => local.some((p) => /jolt-physics.*\.wasm$/.test(p)), { timeout: 20_000 }).toBe(true);
+  expect(local.some((p) => p.endsWith('/garments/3d/vneck/shirt-male.glb'))).toBe(true);
+  await page.waitForTimeout(6000);
+  expect(external).toEqual([]);
+});

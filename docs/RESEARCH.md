@@ -37,10 +37,15 @@ assets were copied; the anchor-based placement, state machine and garment art ar
 | @biomejs/biome | 2.5.14 | MIT/Apache-2.0 | Lint + format in one tool, works with TS 7 (does not depend on the TS compiler) |
 | lucide-react | 1.48.0 | ISC | Small accessible icon set (canonical v1 names used, e.g. `TriangleAlert`) |
 | @types/node | 24.13.6 | MIT | Matches Node 24 |
+| three | **0.186.1** | MIT | 3D garment path (added 2026-09-26): GLTFLoader, SkeletonUtils, SkinnedMesh, used directly in the engine (no React Three Fiber) |
+| @types/three | 0.186.0 (dev) | MIT | Types matching three 0.186 |
+| jolt-physics | **1.1.0** | MIT | Experimental cloth mode: single-threaded WASM build, lazy-loaded; the Node tests use the embedded `wasm-compat` build |
+| @gltf-transform/cli | 4.5.0 (dev) | MIT | Inspecting/validating the GLB (`npx gltf-transform inspect/validate`); no derived assets were written |
 
 Not adopted: Tailwind (plain CSS was simpler), Zod (the two schemas — preferences and catalogue —
 are small typed validators), Comlink (native typed messages were ~150 lines), any state library,
-OpenCV.js, TensorFlow.js, Three.js, PixiJS. Nothing measured required them.
+OpenCV.js, TensorFlow.js, PixiJS. Nothing measured required them. (Three.js was later adopted for
+the 3D garments: see the last section.)
 
 Development machine (all measurements in docs/TESTING.md): Windows 10 Pro 22H2 (10.0.19045),
 AMD Ryzen 9 5900X, 32 GB RAM, AMD Radeon RX 9070 XT (driver 32.0.31041.1004), Node 24.19.0,
@@ -131,3 +136,119 @@ worker is a usable fallback; the main-thread path works and is kept as the last 
 - An anchor-based affine transform (plus separately rotated sleeves) is stable and predictable;
   a triangulated warp was not added because the measured problems (bending, turning, off-screen
   hips) are interpretation problems, not warp problems.
+
+## Live 3D garments (2026-09-26, branch `dev/live-3d-garments`)
+
+### Sources consulted (3D work)
+
+The installed packages' own type declarations and runtime behaviour were treated as authoritative
+where they differed from online docs.
+
+| Source | Used for |
+| --- | --- |
+| three.js docs: GLTFLoader, SkinnedMesh, SkeletonUtils, color management, MeshStandardMaterial/MeshPhysicalMaterial | Loading, skin binding (`bind`, `bindMode 'attached'`), safe cloning, sRGB output without tone mapping |
+| `node_modules/jolt-physics/dist/types.d.ts` (1.1.0) | The actual soft-body API: `SoftBodySharedSettings` (faces, `CreateConstraints` with bend types, `mSkinnedConstraints`, `mInvBindMatrices`), `SoftBodyMotionProperties.SkinVertices`, `SetSkinnedMaxDistanceMultiplier`; no JS constructors for `InvBind`/`Skinned` (use `resize()` + `at(i)`) |
+| JoltPhysics.js repository, soft-body demo, Jolt architecture docs (soft bodies) | Concepts (skinned constraints, max distance, LRA, bend types) and the layer/interface setup pattern |
+| MediaPipe Pose Landmarker web guide | `worldLandmarks`: metres, origin at the hip midpoint; paired with `landmarks` by index |
+| glTF Transform CLI | `inspect` / `validate` of the downloaded GLB |
+| Rapier soft-body docs | Considered as an alternative only; not installed, because Jolt passed every required capability test |
+
+### Asset findings
+
+- The GLB is valid: 0 errors, 1 warning (skinned mesh node not at the root, harmless). 7,717
+  vertices, 14,079 triangles, 19 weighted joints, no textures, no animations.
+- **Every joint node has an identity local transform.** The bind pose exists only in the inverse
+  bind matrices, which include Unreal's 0.01 scale. Loaded naively, the skinned shirt collapses
+  into a ~35 cm blob at the origin.
+- The fix, `src/garments/modelLoader.ts`, runs at load:
+  1. rebuild each joint's rest transform as `inverse(parentWorld) · inverse(IBM)`;
+  2. move the complete hierarchy under a clean rig root, including hands, fingers, calves, IK and
+     helper nodes;
+  3. re-bind with an identity bind matrix;
+  4. verify on the CPU that the rest pose reproduces the vertices (measured error <0.1 mm).
+- Skin space is already metres, +Y up, +X = wearer's left, front = +Z, so the documented rest
+  rotation is identity.
+
+### Coordinate conventions
+
+| Space | Units | Axes |
+| --- | --- | --- |
+| MediaPipe normalized image | 0..1 of the processed frame | +x right, +y down; z relative depth |
+| MediaPipe world | metres, hip-centred | +x image right, +y **down**, +z **away** from the camera |
+| Body / garment rest space | metres | +x image right = wearer's **left** when facing, +y up, +z toward the camera |
+| Source pixels | px | +x right, +y down (the video frame) |
+| Scene (WebGL) | px | X = source x, Y = −source y, Z toward the camera; the orthographic camera spans exactly the source frame |
+| Display | device px | `sourceToCanvas` affine: letterbox/cover, DPR, **mirror** |
+
+- World → body is `(x, −y, −z)`.
+- The garment root holds only a uniform px-per-metre scale and a translation; all rotation is in
+  the bones.
+- Mirroring is applied exactly once, when the WebGL layer is composited into the 2D canvas with the
+  video's transform. Anatomical left/right is never flipped internally.
+
+### Projection and fit (weak perspective)
+
+- **Orientation:** torso frames are built from the world shoulders — the hips too when the
+  interpreter trusts them, otherwise camera-up. A rotation about the view axis is then added so the
+  *projected* shoulder line equals the image shoulder line exactly.
+- **Position:** the image shoulder midpoint.
+- **Scale:** image lengths ÷ projected world lengths of the same segments (shoulders, plus torso when
+  the hips are usable).
+- **Proportions:** the wearer's shoulder width and torso ratio are learned slowly, and only from
+  near-frontal samples. Arms use the world elbow and wrist directions, but only when the interpreter
+  trusted those landmarks in the image.
+- No perspective FOV is assumed. Registration is checked in unit tests through the full display
+  transform, and visually with the magenta anchor overlay.
+
+### Interpreter change for 3D
+
+- The 2D thresholds are unchanged. A 3D garment switches the interpreter to its rig limits: fade
+  from 50°, hide beyond 72°, and a "narrow shoulders" ratio of cos(72°).
+- **Bug found by the synthetic 3D tests:** the "foreshortened torso" rule divided the torso length by
+  the *current* shoulder width. Starting tracking on someone already turned 45° was therefore
+  misread as bending. In 3D mode the width is now divided by cos(yaw) first
+  (`yawCompensatedWidth`); the 2D mode keeps the old behaviour.
+
+### Jolt evaluation
+
+A local proof (kept as `tests/unit/cloth.test.ts › Jolt capability proof`) showed:
+
+- pinned (invMass 0) vertices follow a moving skinned joint to <0.1 mm through `SkinVertices`;
+- free vertices stay within their per-vertex skinned max distance;
+- vertical stretch is below 5% with rigid edges;
+- a moving kinematic capsule (`MoveKinematic`) is never penetrated.
+
+That covers every capability required, so the XPBD fallback and Rapier were not needed. Integration
+findings:
+
+1. **Linear-blend skinning distorts the target shape** near joints (armpits compress and stretch up
+   to ~4×), and rigid cloth edges then fight the attachment limits. Two fixes:
+   - particles whose skin weights are split between torso and arm are pinned too;
+   - slightly compliant edges are used (5e-5; measured overshoot 7 cm at 0 → ~2 cm).
+2. **Float rounding** sometimes produced 0 substeps for a 1/60 s frame, which left Jolt's targets a
+   frame stale. Fixed with an epsilon in the step count; a frame without a step reuses the previous
+   displacement.
+3. **Heap layout:** `SoftBodyVertex` has a stride of 80 bytes with `mPosition` at offset 16, and a
+   `Mat44` is 64 bytes, column-major. Particle positions and joint matrices are therefore
+   read/written through `HEAPF32` with no per-particle allocations. Offsets are measured at runtime,
+   not hard-coded.
+4. **Ownership:**
+   - `sIdentity()` returns an Emscripten static temporary: it is borrowed and never destroyed;
+   - shared settings and shapes are ref-counted and owned by their bodies;
+   - the JoltInterface, joint array and reusable vectors are destroyed on dispose.
+5. **Loading:** Vite emits `jolt-physics.wasm.wasm` as a local asset (2.0 MB, 0.76 MB gzip).
+   `locateFile` points to it, so the fetch guard and CSP pass; this is verified in dev and in
+   production preview. No cross-origin isolation or multithreading is used.
+
+### Rendering decisions
+
+- The 3D garment is drawn into a **separate transparent WebGL canvas**, because the visible canvas
+  owns a 2D context. That layer is then composited with `drawImage` in the same task right after
+  `render()`, so `preserveDrawingBuffer` is not needed; the copy measured ≤0.1 ms.
+- The layer is rendered opaque and faded as a whole with `globalAlpha`, which avoids
+  double-sided transparency sorting artefacts.
+- Output is sRGB with no tone mapping; the video never passes through WebGL.
+- Material: MeshPhysicalMaterial (roughness ~0.86, metalness 0, light sheen, double-sided) under a
+  hemisphere light, a frontal key and a weak fill. There are no shadows.
+- In cloth mode the renderer switches to a plain (non-skinned) mesh. Its vertices are CPU-skinned,
+  then displaced, and normals are recomputed across UV-seam welds, so nothing is skinned twice.

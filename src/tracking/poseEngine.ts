@@ -5,7 +5,7 @@
  * identically. Everything here is inference only; interpretation lives in src/fitting/.
  */
 import { PoseLandmarker } from '@mediapipe/tasks-vision';
-import { packLandmarks } from './landmarks';
+import { type DetectedPose, pairDetections } from './landmarks';
 import {
   type DetectOutput,
   type EngineInfo,
@@ -54,6 +54,25 @@ async function fetchModel(url: string, onProgress: (p: LoadProgress) => void): P
     offset += chunk.byteLength;
   }
   return buffer;
+}
+
+/** The subset of a PoseLandmarkerResult read here (lets tests pass a plain object). */
+export interface LandmarkerResultLike {
+  landmarks: ReadonlyArray<ReadonlyArray<{ x: number; y: number; z: number; visibility?: number }>>;
+  worldLandmarks?: ReadonlyArray<ReadonlyArray<{ x: number; y: number; z: number; visibility?: number }>>;
+  close(): void;
+}
+
+/**
+ * Copies image AND world landmarks (paired by person index) out of the result, then closes it.
+ * Both copies are made before close(), which may free the underlying data.
+ */
+export function copyResult(result: LandmarkerResultLike): DetectedPose[] {
+  try {
+    return pairDetections(result.landmarks, result.worldLandmarks);
+  } finally {
+    result.close();
+  }
 }
 
 export class PoseEngine {
@@ -135,9 +154,7 @@ export class PoseEngine {
     const started = performance.now();
     const result = this.landmarker.detectForVideo(frame, ts);
     const inferenceMs = performance.now() - started;
-    const poses = result.landmarks.map((pose) => packLandmarks(pose));
-    result.close();
-    return { poses, inferenceMs };
+    return { poses: copyResult(result), inferenceMs };
   }
 
   /**

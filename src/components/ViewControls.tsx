@@ -1,4 +1,4 @@
-import { Expand, FlipHorizontal2, Hand, Minimize, Shirt } from 'lucide-react';
+import { Expand, FlipHorizontal2, Hand, Minimize, Shirt, Wind } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 function Toggle({
@@ -32,22 +32,27 @@ export function ViewControls({
   showGarment,
   mirror,
   occlusion,
+  fabricMotion,
   fullscreen,
   fitMode,
   onToggleGarment,
   onToggleMirror,
   onToggleOcclusion,
+  onToggleFabricMotion,
   onToggleFullscreen,
   onToggleFitMode,
 }: {
   showGarment: boolean;
   mirror: boolean;
   occlusion: boolean;
+  /** null when the selected garment has no fabric-motion mode. */
+  fabricMotion: boolean | null;
   fullscreen: boolean;
   fitMode: 'contain' | 'cover';
   onToggleGarment: () => void;
   onToggleMirror: () => void;
   onToggleOcclusion: () => void;
+  onToggleFabricMotion: () => void;
   onToggleFullscreen: () => void;
   onToggleFitMode: () => void;
 }) {
@@ -75,6 +80,14 @@ export function ViewControls({
           icon={<Hand aria-hidden size={18} />}
           label="Arms in front (beta)"
         />
+        {fabricMotion !== null && (
+          <Toggle
+            pressed={fabricMotion}
+            onToggle={onToggleFabricMotion}
+            icon={<Wind aria-hidden size={18} />}
+            label="Fabric motion (beta)"
+          />
+        )}
         <Toggle
           pressed={fullscreen}
           onToggle={onToggleFullscreen}

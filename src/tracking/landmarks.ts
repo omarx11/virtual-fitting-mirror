@@ -43,8 +43,30 @@ export const LANDMARK_COUNT = 33;
 /** Floats per landmark in the packed transfer format: x, y, z, visibility. */
 export const LANDMARK_STRIDE = 4;
 
-/** One detected pose, packed as Float32Array(33 × 4) of normalized x, y, z, visibility. */
-export type PackedPose = Float32Array;
+/**
+ * One detected pose in NORMALIZED IMAGE space, packed as Float32Array(33 × 4) of x, y (0..1 of the
+ * processed frame), z (relative depth, roughly x scale) and visibility.
+ */
+export type PackedPose = Float32Array & { readonly __space?: 'normalized-image' };
+
+/**
+ * The same detected pose in MediaPipe WORLD space, packed as Float32Array(33 × 4) of x, y, z in
+ * metres and visibility. Origin is the midpoint of the hips; x points to image right, y down, z away
+ * from the camera. These are hip-relative model estimates, not calibrated camera coordinates, and
+ * must never be treated as image positions.
+ */
+export type PackedWorldPose = Float32Array & { readonly __space?: 'world-metres' };
+
+/**
+ * Image and world landmarks for ONE detected person. They come from the same MediaPipe result
+ * index and are kept together from inference to interpretation, so a world pose can never be
+ * attached to a different person's image pose.
+ */
+export interface DetectedPose {
+  image: PackedPose;
+  /** Null when the model returned no world landmarks for this person. */
+  world: PackedWorldPose | null;
+}
 
 export interface Landmark {
   /** Normalized [0,1] image x (may lie outside when the model extrapolates off-screen). */
@@ -56,7 +78,8 @@ export interface Landmark {
   visibility: number;
 }
 
-export function readLandmark(pose: PackedPose, index: number): Landmark {
+/** Raw reader for either packed space; the caller decides what the numbers mean. */
+export function readLandmark(pose: PackedPose | PackedWorldPose, index: number): Landmark {
   const o = index * LANDMARK_STRIDE;
   return {
     x: pose[o] ?? Number.NaN,
@@ -66,9 +89,9 @@ export function readLandmark(pose: PackedPose, index: number): Landmark {
   };
 }
 
-export function packLandmarks(
-  landmarks: ReadonlyArray<{ x: number; y: number; z: number; visibility?: number }>,
-): PackedPose {
+type RawLandmarks = ReadonlyArray<{ x: number; y: number; z: number; visibility?: number }>;
+
+function pack(landmarks: RawLandmarks): Float32Array {
   const out = new Float32Array(LANDMARK_COUNT * LANDMARK_STRIDE);
   const n = Math.min(LANDMARK_COUNT, landmarks.length);
   for (let i = 0; i < n; i++) {
@@ -79,6 +102,41 @@ export function packLandmarks(
     out[o + 1] = lm.y;
     out[o + 2] = lm.z;
     out[o + 3] = lm.visibility ?? 0;
+  }
+  return out;
+}
+
+/** Copies normalized image landmarks out of a MediaPipe result (before it is closed). */
+export function packLandmarks(landmarks: RawLandmarks): PackedPose {
+  return pack(landmarks);
+}
+
+/** Copies world landmarks (metres, hip-centred) out of a MediaPipe result (before it is closed). */
+export function packWorldLandmarks(landmarks: RawLandmarks): PackedWorldPose {
+  return pack(landmarks);
+}
+
+/**
+ * Pairs image and world landmarks by detected-person index. MediaPipe returns both arrays in the
+ * same order; a missing or shorter world array yields `world: null` rather than a mismatched pair.
+ */
+export function pairDetections(
+  image: readonly RawLandmarks[],
+  world: readonly RawLandmarks[] | undefined,
+): DetectedPose[] {
+  const sameLength = world !== undefined && world.length === image.length;
+  return image.map((pose, i) => {
+    const w = sameLength ? world[i] : undefined;
+    return { image: packLandmarks(pose), world: w && w.length > 0 ? packWorldLandmarks(w) : null };
+  });
+}
+
+/** Buffers to transfer (not copy) when posting detections from the worker. */
+export function detectionTransferables(poses: readonly DetectedPose[]): ArrayBuffer[] {
+  const out: ArrayBuffer[] = [];
+  for (const p of poses) {
+    out.push(p.image.buffer as ArrayBuffer);
+    if (p.world) out.push(p.world.buffer as ArrayBuffer);
   }
   return out;
 }

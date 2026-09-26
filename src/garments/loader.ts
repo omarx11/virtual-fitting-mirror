@@ -2,7 +2,7 @@
  * Preloads garment images into ImageBitmaps (decoded once, cheap to draw every frame). SVGs are
  * rasterised at 2× their intrinsic size so they stay crisp when scaled up on large screens.
  */
-import type { GarmentDefinition, GarmentImage } from './types';
+import type { Garment2DDefinition, GarmentImage } from './types';
 
 export const RASTER_SCALE = 2;
 
@@ -14,7 +14,7 @@ export interface LoadedPart {
 }
 
 export interface LoadedGarment {
-  definition: GarmentDefinition;
+  definition: Garment2DDefinition;
   body: LoadedPart;
   leftSleeve: LoadedPart | null;
   rightSleeve: LoadedPart | null;
@@ -38,7 +38,7 @@ async function loadPart(part: GarmentImage): Promise<LoadedPart> {
   return { bitmap, width: part.width, height: part.height };
 }
 
-export async function loadGarment(definition: GarmentDefinition): Promise<LoadedGarment> {
+export async function loadGarment(definition: Garment2DDefinition): Promise<LoadedGarment> {
   const [body, leftSleeve, rightSleeve] = await Promise.all([
     loadPart(definition.body),
     definition.sleeves ? loadPart(definition.sleeves.left) : Promise.resolve(null),
@@ -59,7 +59,7 @@ export class GarmentLibrary {
   private errors = new Map<string, string>();
   private disposed = false;
 
-  async preload(definitions: readonly GarmentDefinition[], onUpdate?: () => void): Promise<void> {
+  async preload(definitions: readonly Garment2DDefinition[], onUpdate?: () => void): Promise<void> {
     await Promise.all(
       definitions.map(async (def) => {
         try {

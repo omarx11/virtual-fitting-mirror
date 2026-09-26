@@ -8,10 +8,11 @@ import {
 import type { GarmentPose } from '../../src/fitting/smoother';
 import { armOutwardAngle } from '../../src/fitting/smoother';
 import { GARMENTS } from '../../src/garments/catalogue';
+import type { Garment2DDefinition } from '../../src/garments/types';
 import { applyToPoint } from '../../src/rendering/matrix';
 
-const garment = GARMENTS[0];
-if (!garment) throw new Error('catalogue empty');
+const garment = GARMENTS.find((g): g is Garment2DDefinition => g.kind === '2d');
+if (!garment) throw new Error('no 2D garment in the catalogue');
 
 const pose = (p: Partial<GarmentPose> = {}): GarmentPose => ({
   center: { x: 640, y: 300 },
@@ -136,6 +137,14 @@ describe('catalogue', () => {
     const ids = new Set<string>();
     for (const g of GARMENTS) {
       ids.add(g.id);
+      expect(g.license.name).toBeTruthy();
+      expect(g.supportedViews).toContain('front');
+      if (g.kind === '3d') {
+        // Third-party 3D asset: never labelled with the demo art CC0 licence.
+        expect(g.license.name).not.toMatch(/CC0/);
+        expect(g.materials.some((m) => m.id === g.defaultMaterialId)).toBe(true);
+        continue;
+      }
       expect(g.anchors.leftShoulder.x).toBeGreaterThan(g.anchors.rightShoulder.x);
       expect(g.anchors.hem.y).toBeGreaterThan(g.anchors.leftShoulder.y);
       expect(g.license.name).toBeTruthy();

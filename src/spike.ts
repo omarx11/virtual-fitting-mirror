@@ -79,7 +79,7 @@ $<HTMLInputElement>('file').addEventListener('change', async (e) => {
             detected++;
             ctx.fillStyle = 'lime';
             for (const i of [LM.leftShoulder, LM.rightShoulder, LM.leftHip, LM.rightHip, LM.nose]) {
-              const lm = readLandmark(pose, i);
+              const lm = readLandmark(pose.image, i);
               ctx.fillRect(lm.x * canvas.width - 4, lm.y * canvas.height - 4, 8, 8);
             }
           }

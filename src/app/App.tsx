@@ -6,7 +6,7 @@ import { SourceControls } from '../components/SourceControls';
 import { StageOverlay } from '../components/StageOverlay';
 import { Transport } from '../components/Transport';
 import { ViewControls } from '../components/ViewControls';
-import { GARMENTS } from '../garments/catalogue';
+import { findGarment, GARMENTS } from '../garments/catalogue';
 import type { EngineSettings } from './MirrorEngine';
 import { loadPreferences, type Preferences, savePreferences } from './preferences';
 import { useMirrorEngine } from './useMirrorEngine';
@@ -23,6 +23,7 @@ export function App() {
   const [prefs, setPrefs] = useState<Preferences>(loadPreferences);
   const { engine, snapshot, initError } = useMirrorEngine(canvasRef, stageRef, prefs);
   const [fullscreen, setFullscreen] = useState(false);
+  const [showRig, setShowRig] = useState(false);
 
   const update = useCallback(
     (patch: Partial<Preferences>) => {
@@ -100,6 +101,7 @@ export function App() {
 
   const hasSource = snapshot?.source.state === 'ready' || snapshot?.source.state === 'loading';
   const isFile = snapshot?.source.state === 'ready' && snapshot.source.kind === 'file';
+  const selectedGarment = findGarment(prefs.garmentId);
 
   return (
     <div className="app" ref={appRef}>
@@ -140,6 +142,10 @@ export function App() {
                 garments={GARMENTS}
                 selectedId={prefs.garmentId}
                 onSelect={(id) => update({ garmentId: id })}
+                materialId={prefs.materialId}
+                onMaterial={(id) => update({ materialId: id })}
+                status3d={snapshot.garment3d}
+                onRetry3d={() => engine.retryGarment()}
               />
               {snapshot.garmentError && (
                 <p className="error-text" role="alert">
@@ -155,11 +161,19 @@ export function App() {
                 showGarment={prefs.showGarment}
                 mirror={prefs.mirror}
                 occlusion={prefs.occlusion}
+                fabricMotion={
+                  selectedGarment.kind === '3d' && selectedGarment.simulation
+                    ? prefs.motion === 'cloth'
+                    : null
+                }
                 fullscreen={fullscreen}
                 fitMode={prefs.fitMode}
                 onToggleGarment={() => update({ showGarment: !prefs.showGarment })}
                 onToggleMirror={() => update({ mirror: !prefs.mirror })}
                 onToggleOcclusion={() => update({ occlusion: !prefs.occlusion })}
+                onToggleFabricMotion={() =>
+                  update({ motion: prefs.motion === 'cloth' ? 'skeletal' : 'cloth' })
+                }
                 onToggleFullscreen={toggleFullscreen}
                 onToggleFitMode={() => update({ fitMode: prefs.fitMode === 'contain' ? 'cover' : 'contain' })}
               />
@@ -175,12 +189,24 @@ export function App() {
                 onPreset={(preset) => update({ preset })}
                 delegate={prefs.delegate}
                 onDelegate={(delegate) => update({ delegate })}
+                tuning={engine.getClothTuning()}
+                onTuning={(patch) => engine.setClothTuning(patch)}
+                showRig={showRig}
+                {...(import.meta.env.DEV
+                  ? {
+                      onToggleRig: () => {
+                        engine.setDebugHelpers(!showRig);
+                        setShowRig(!showRig);
+                      },
+                    }
+                  : {})}
               />
             </section>
             <p className="footnote">
-              Approximate 2D preview — not a size or fit measurement. Video stays on this device, and outgoing
-              requests (including MediaPipe usage metrics) are blocked. Shortcuts: Space play/pause · [ ]
-              shirts · G shirt · M mirror · F fullscreen · D diagnostics.
+              Approximate visual preview — not a size or fit measurement, and your own clothing may show at
+              the edges. Video stays on this device, and outgoing requests (including MediaPipe usage metrics)
+              are blocked. Shortcuts: Space play/pause · [ ] shirts · G shirt · M mirror · F fullscreen · D
+              diagnostics.
             </p>
           </>
         )}

@@ -4,10 +4,24 @@
  */
 import type { TrackingConfig } from '../config/tracking';
 import type { Point } from '../rendering/matrix';
-import { LANDMARK_COUNT, LM, type PackedPose, readLandmark } from '../tracking/landmarks';
+import {
+  LANDMARK_COUNT,
+  LM,
+  type PackedPose,
+  type PackedWorldPose,
+  readLandmark,
+} from '../tracking/landmarks';
 
 export interface ObservedLandmark extends Point {
   /** Depth scaled to source pixels (MediaPipe z is roughly in units of image width). */
+  z: number;
+  visibility: number;
+}
+
+/** A MediaPipe world landmark: metres, hip-centred, x image-right, y DOWN, z AWAY from the camera. */
+export interface WorldLandmark {
+  x: number;
+  y: number;
   z: number;
   visibility: number;
 }
@@ -16,16 +30,36 @@ export interface PoseObservation {
   /** Source frame size in pixels (the aspect ratio the landmarks are normalized against). */
   width: number;
   height: number;
+  /** Image landmarks converted to SOURCE PIXELS. */
   landmarks: ObservedLandmark[];
+  /**
+   * World landmarks of the SAME person (same MediaPipe result index), or null. Metres; never mix
+   * these with the pixel coordinates above.
+   */
+  world: WorldLandmark[] | null;
 }
 
-export function toObservation(pose: PackedPose, width: number, height: number): PoseObservation {
+export function toObservation(
+  pose: PackedPose,
+  width: number,
+  height: number,
+  world: PackedWorldPose | null = null,
+): PoseObservation {
   const landmarks: ObservedLandmark[] = [];
   for (let i = 0; i < LANDMARK_COUNT; i++) {
     const lm = readLandmark(pose, i);
     landmarks.push({ x: lm.x * width, y: lm.y * height, z: lm.z * width, visibility: lm.visibility });
   }
-  return { width, height, landmarks };
+  let worldLandmarks: WorldLandmark[] | null = null;
+  if (world) {
+    worldLandmarks = [];
+    for (let i = 0; i < LANDMARK_COUNT; i++) worldLandmarks.push(readLandmark(world, i));
+  }
+  return { width, height, landmarks, world: worldLandmarks };
+}
+
+export function worldLm(obs: PoseObservation, index: number): WorldLandmark | null {
+  return obs.world?.[index] ?? null;
 }
 
 export function lm(obs: PoseObservation, index: number): ObservedLandmark {

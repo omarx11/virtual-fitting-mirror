@@ -26,6 +26,8 @@ export interface SyntheticPoseOptions {
   backView?: boolean;
   /** Arms raised sideways by this outward angle (degrees). */
   armOutwardDeg?: number;
+  /** Set false to omit world landmarks (as if the model returned none). */
+  world?: boolean;
 }
 
 export function syntheticPose(o: SyntheticPoseOptions = {}): PoseObservation {
@@ -84,7 +86,26 @@ export function syntheticPose(o: SyntheticPoseOptions = {}): PoseObservation {
   const hipVis = o.hipsVisible === false ? 0.05 : 0.97;
   set(LM.leftHip, at(0.35 * side, ratio), hipVis);
   set(LM.rightHip, at(-0.35 * side, ratio), hipVis);
-  return toObservation(packed, fw, fh);
+  return toObservation(packed, fw, fh, o.world === false ? null : worldFromImage(packed, fw, fh, w));
+}
+
+/**
+ * World landmarks consistent with the synthetic image layout: an orthographic back-projection with
+ * the shoulder width taken as 0.36 m, hip-centred, y down, z away from the camera (MediaPipe axes).
+ */
+function worldFromImage(image: Float32Array, fw: number, fh: number, shoulderPx: number): Float32Array {
+  const ppm = shoulderPx / 0.36;
+  const world = new Float32Array(image.length);
+  const hx = ((image[LM.leftHip * 4] ?? 0) + (image[LM.rightHip * 4] ?? 0)) / 2;
+  const hy = ((image[LM.leftHip * 4 + 1] ?? 0) + (image[LM.rightHip * 4 + 1] ?? 0)) / 2;
+  for (let i = 0; i < LANDMARK_COUNT; i++) {
+    const k = i * LANDMARK_STRIDE;
+    world[k] = (((image[k] ?? 0) - hx) * fw) / ppm;
+    world[k + 1] = (((image[k + 1] ?? 0) - hy) * fh) / ppm;
+    world[k + 2] = ((image[k + 2] ?? 0) * fw) / ppm;
+    world[k + 3] = image[k + 3] ?? 0;
+  }
+  return world;
 }
 
 /** Feeds the same pose repeatedly at a given frame interval; returns the last interpretation. */

@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "tests/e2e"]
+  "include": ["vite.config.ts", "playwright.config.ts", "playwright.preview.config.ts", "tests/e2e"]
 }

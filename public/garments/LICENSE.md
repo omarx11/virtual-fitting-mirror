@@ -1,8 +1,11 @@
 # Demo garment artwork
 
-All files in this folder are **original placeholder artwork** created for this prototype by
-`scripts/generate-garments.mjs`. They are not real products. Dedicated to the public domain under
-**CC0-1.0** (https://creativecommons.org/publicdomain/zero/1.0/).
+The 2D files in this folder (the four folders below) are **original placeholder artwork** created
+for this prototype by `scripts/generate-garments.mjs`. They are not real products. Dedicated to the
+public domain under **CC0-1.0** (https://creativecommons.org/publicdomain/zero/1.0/).
+
+**Exception: `3d/` is NOT covered by this licence.** It holds a third-party 3D model (and a
+thumbnail rendered from it) under its own licence; see `assets/garments/vneck/SOURCE.md`.
 
 | Garment | Folder | Parts |
 | --- | --- | --- |

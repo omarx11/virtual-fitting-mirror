@@ -25,7 +25,7 @@ export const PHASE_MESSAGES: Record<TrackingPhase, StatusMessage> = {
   turned: {
     tone: 'warn',
     title: 'Face the mirror',
-    detail: 'Stand upright facing the camera — the 2D shirt only follows a front view.',
+    detail: 'Stand upright facing the camera — side and back views are not supported.',
   },
   searching: {
     tone: 'info',

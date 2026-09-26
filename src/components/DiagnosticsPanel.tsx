@@ -1,6 +1,7 @@
 import type { EngineSnapshot } from '../app/MirrorEngine';
 import type { DelegatePreference, QualityPreset } from '../config/performance';
 import { QUALITY_PRESETS } from '../config/performance';
+import type { ClothTuning } from '../physics/types';
 import { TASKS_VISION_VERSION } from '../tracking/assets';
 
 const fmt = (v: number | null | undefined, digits = 1) =>
@@ -16,6 +17,10 @@ export function DiagnosticsPanel({
   onPreset,
   delegate,
   onDelegate,
+  tuning,
+  onTuning,
+  showRig,
+  onToggleRig,
 }: {
   snapshot: EngineSnapshot;
   open: boolean;
@@ -26,10 +31,18 @@ export function DiagnosticsPanel({
   onPreset: (id: QualityPreset['id']) => void;
   delegate: DelegatePreference;
   onDelegate: (d: DelegatePreference) => void;
+  /** Cloth solver tuning (developer controls), null when cloth is not running. */
+  tuning: ClothTuning | null;
+  onTuning?: (patch: Partial<ClothTuning>) => void;
+  showRig: boolean;
+  /** Development builds only. */
+  onToggleRig?: () => void;
 }) {
   const d = snapshot.diagnostics;
   const t = snapshot.tracker;
   const i = d.interpretation;
+  const g3 = d.garment3d;
+  const cloth = g3?.cloth;
   return (
     <details
       className="diagnostics"
@@ -133,10 +146,182 @@ export function DiagnosticsPanel({
         <dt>Opacity</dt>
         <dd>{fmt(d.opacity, 2)}</dd>
       </dl>
+      {g3 && (
+        <>
+          <h3 className="diag-subtitle">3D garment</h3>
+          <dl className="diag-grid" data-testid="diagnostics-3d">
+            <dt>Model</dt>
+            <dd title={g3.variant}>
+              {g3.triangles.toLocaleString()} tris · {g3.vertices.toLocaleString()} verts · {g3.joints} joints
+            </dd>
+            <dt>Mode</dt>
+            <dd>
+              {g3.mode}
+              {g3.contextLost ? ' (WebGL context lost)' : ''}
+            </dd>
+            <dt>Orientation</dt>
+            <dd>
+              {g3.orientation ?? '—'} · yaw {g3.yawDeg === null ? '—' : `${fmt(g3.yawDeg, 0)}°`}
+            </dd>
+            <dt>Arms L/R</dt>
+            <dd>{g3.armState ?? '—'}</dd>
+            <dt>Scale / torso</dt>
+            <dd>
+              {fmt(g3.pxPerMetre, 0)} px/m · ×{fmt(g3.torsoLength, 2)}
+            </dd>
+            <dt>Render ms</dt>
+            <dd>
+              {fmt(g3.renderMs.median, 2)} (p95 {fmt(g3.renderMs.p95, 2)})
+            </dd>
+            <dt>Layer copy ms</dt>
+            <dd>
+              {fmt(g3.copyMs.median, 2)} (p95 {fmt(g3.copyMs.p95, 2)})
+            </dd>
+            <dt>Render size</dt>
+            <dd>{g3.renderSize ? `${g3.renderSize.width}×${g3.renderSize.height}` : '—'}</dd>
+            <dt>Arm cutout ms</dt>
+            <dd>{fmt(g3.occlusionMs, 2)}</dd>
+          </dl>
+          <h3 className="diag-subtitle">Cloth (experimental)</h3>
+          <dl className="diag-grid" data-testid="diagnostics-cloth">
+            <dt>State</dt>
+            <dd className={cloth?.state === 'error' || cloth?.state === 'disabled' ? 'warn-text' : undefined}>
+              {cloth?.state ?? 'off'}
+            </dd>
+            {cloth?.message && (
+              <>
+                <dt>Note</dt>
+                <dd className="warn-text">{cloth.message}</dd>
+              </>
+            )}
+            <dt>Engine</dt>
+            <dd>{cloth?.engine ?? '—'}</dd>
+            <dt>Particles / edges</dt>
+            <dd>
+              {cloth?.particles ?? 0} / {cloth?.edges ?? 0} · {cloth?.colliders ?? 0} colliders
+            </dd>
+            <dt>Solver ms</dt>
+            <dd>
+              {fmt(cloth?.stepMs.median, 2)} (p95 {fmt(cloth?.stepMs.p95, 2)}) · map {fmt(cloth?.mapMs, 2)}
+            </dd>
+            <dt>Substeps / dropped</dt>
+            <dd>
+              {cloth?.substepsLastFrame ?? 0} / {fmt(cloth?.droppedTimeMs, 0)} ms
+            </dd>
+            <dt>Resets</dt>
+            <dd>
+              {cloth?.resets ?? 0} {cloth?.lastResetReason ? `(${cloth.lastResetReason})` : ''}
+            </dd>
+            <dt>Max dev / stretch</dt>
+            <dd>
+              {fmt((cloth?.maxDeviationM ?? 0) * 100, 1)} cm · ×{fmt(cloth?.stretchP99, 2)} p99 (max ×
+              {fmt(cloth?.maxStretch, 2)})
+            </dd>
+          </dl>
+          {tuning && onTuning && (
+            <div className="diag-controls" data-testid="cloth-tuning">
+              <TuningRow
+                label="Max deviation ×"
+                value={tuning.deviationScale}
+                min={0}
+                max={2}
+                step={0.05}
+                onChange={(v) => onTuning({ deviationScale: v })}
+              />
+              <TuningRow
+                label="Iterations"
+                value={tuning.iterations}
+                min={2}
+                max={16}
+                step={1}
+                onChange={(v) => onTuning({ iterations: v })}
+              />
+              <TuningRow
+                label="Bend compliance"
+                value={tuning.bendCompliance}
+                min={0}
+                max={0.02}
+                step={0.0005}
+                onChange={(v) => onTuning({ bendCompliance: v })}
+              />
+              <TuningRow
+                label="Damping"
+                value={tuning.linearDamping}
+                min={0}
+                max={3}
+                step={0.05}
+                onChange={(v) => onTuning({ linearDamping: v })}
+              />
+              <TuningRow
+                label="Gravity ×"
+                value={tuning.gravityFactor}
+                min={0}
+                max={2}
+                step={0.05}
+                onChange={(v) => onTuning({ gravityFactor: v })}
+              />
+              <TuningRow
+                label="Max substeps"
+                value={tuning.maxSubsteps}
+                min={1}
+                max={6}
+                step={1}
+                onChange={(v) => onTuning({ maxSubsteps: v })}
+              />
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={tuning.colliders}
+                  onChange={() => onTuning({ colliders: !tuning.colliders })}
+                />{' '}
+                Body colliders
+              </label>
+            </div>
+          )}
+          {onToggleRig && (
+            <label className="check">
+              <input type="checkbox" checked={showRig} onChange={onToggleRig} /> Show rig helpers (dev)
+            </label>
+          )}
+        </>
+      )}
       <p className="hint">
         Frame→pose: time from a video frame being presented to its pose result (capture, transfer, inference).
-        Pose age: media-time gap between the displayed frame and the frame the pose came from.
+        Pose age: media-time gap between the displayed frame and the frame the pose came from. With landmarks
+        on, magenta crosses mark the garment's shoulder anchors (registration check) and yellow capsules the
+        forearm cutouts.
       </p>
     </details>
+  );
+}
+
+function TuningRow({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="tuning-row">
+      <span>{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <output>{step < 1 ? value.toFixed(step < 0.01 ? 4 : 2) : value}</output>
+    </label>
   );
 }

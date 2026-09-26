@@ -2,7 +2,7 @@
   "name": "virtual-fitting-mirror",
   "private": true,
   "version": "0.1.0",
-  "description": "Local, free, browser-based 2D shirt overlay mirror prototype (MediaPipe Pose Landmarker + Canvas).",
+  "description": "Local, free, browser-based fitting mirror prototype: MediaPipe Pose Landmarker + a rigged 3D garment (Three.js) driven by live tracking, with optional Jolt cloth motion.",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -22,20 +22,27 @@
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "generate:garments": "node scripts/generate-garments.mjs",
-    "fetch:footage": "node test-footage/fetch-footage.mjs"
+    "fetch:footage": "node test-footage/fetch-footage.mjs",
+    "generate:3d-thumbnail": "node scripts/generate-3d-thumbnail.mjs",
+    "inspect:garment": "node scripts/inspect-garment.mjs public/garments/3d/vneck/shirt-male.glb",
+    "test:e2e:preview": "npm run build && playwright test -c playwright.preview.config.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",
+    "jolt-physics": "1.1.0",
     "lucide-react": "1.48.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@gltf-transform/cli": "4.5.0",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.1",
     "typescript": "7.0.2",
     "vite": "8.3.1",

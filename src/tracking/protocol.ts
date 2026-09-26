@@ -1,5 +1,5 @@
 import type { DelegatePreference, ModelVariant } from '../config/performance';
-import type { PackedPose } from './landmarks';
+import type { DetectedPose } from './landmarks';
 
 export interface EngineInitOptions {
   modelUrl: string;
@@ -32,7 +32,8 @@ export interface LoadProgress {
 }
 
 export interface DetectOutput {
-  poses: PackedPose[];
+  /** One entry per detected person: image + world landmarks from the same result index. */
+  poses: DetectedPose[];
   /** Wall time spent inside detectForVideo (excludes transfer/queueing). */
   inferenceMs: number;
 }

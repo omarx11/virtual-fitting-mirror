@@ -4,6 +4,7 @@
  * `reset` sent after a `detect` is applied after it. The main thread guarantees at most one detect
  * in flight, so no queue can build up here.
  */
+import { detectionTransferables } from './landmarks';
 import { installLocalOnlyFetch } from './networkGuard';
 import { PoseEngine } from './poseEngine';
 import { EngineInitError, type WorkerRequest, type WorkerResponse } from './protocol';
@@ -45,10 +46,7 @@ async function handle(request: WorkerRequest): Promise<void> {
       try {
         if (!engine) throw new Error('Tracking engine is not initialised');
         const output = engine.detect(request.frame, request.timestampMs);
-        post(
-          { type: 'result', id: request.id, output },
-          output.poses.map((p) => p.buffer as ArrayBuffer),
-        );
+        post({ type: 'result', id: request.id, output }, detectionTransferables(output.poses));
       } catch (error) {
         post({
           type: 'detect-error',

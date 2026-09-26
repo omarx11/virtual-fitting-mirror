@@ -65,6 +65,12 @@ export interface TrackingConfig {
 
   /** Results older than this (frame time vs displayed frame) are not drawn. */
   maxPoseAgeMs: number;
+
+  /**
+   * Divide the shoulder width by cos(estimated yaw) before using it as the torso-length basis, so a
+   * modest turn is not mistaken for bending (foreshortening). Off for 2D garments.
+   */
+  yawCompensatedWidth: boolean;
 }
 
 export const TRACKING_CONFIG: TrackingConfig = {
@@ -99,4 +105,22 @@ export const TRACKING_CONFIG: TrackingConfig = {
   minShoulderWidthPx: 12,
 
   maxPoseAgeMs: 250,
+  yawCompensatedWidth: false,
 };
+
+/**
+ * Interpreter thresholds for a rigged 3D garment. Only the turn limits differ from the 2D config:
+ * a 3D garment can follow validated modest turns (its rig limits), so the yaw fade/hide thresholds
+ * and the "narrow shoulders" test are relaxed to that limit. Back views, bending over, tilt and
+ * the face-visibility gate are unchanged, and the 2D garments keep TRACKING_CONFIG as before.
+ */
+export function trackingConfigFor3D(limits: { yawFadeStartDeg: number; yawHideDeg: number }): TrackingConfig {
+  return {
+    ...TRACKING_CONFIG,
+    yawFadeStartDeg: limits.yawFadeStartDeg,
+    yawHideDeg: limits.yawHideDeg,
+    // Shoulders foreshortened to cos(hide angle) of the recent frontal width ⇒ beyond the limit.
+    turnedWidthRatio: Math.cos((limits.yawHideDeg * Math.PI) / 180),
+    yawCompensatedWidth: true,
+  };
+}

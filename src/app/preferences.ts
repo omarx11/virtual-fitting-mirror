@@ -24,6 +24,8 @@ export function parsePreferences(raw: unknown): Preferences {
   const r = raw as Record<string, unknown>;
   if (typeof r.garmentId === 'string' && GARMENTS.some((g) => g.id === r.garmentId))
     p.garmentId = r.garmentId;
+  if (typeof r.materialId === 'string' && r.materialId.length <= 64) p.materialId = r.materialId;
+  if (r.motion === 'skeletal' || r.motion === 'cloth') p.motion = r.motion;
   if (isBool(r.showGarment)) p.showGarment = r.showGarment;
   if (isBool(r.mirror)) p.mirror = r.mirror;
   if (isBool(r.showLandmarks)) p.showLandmarks = r.showLandmarks;

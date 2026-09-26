@@ -52,3 +52,22 @@ None block the software. For a real acceptance evaluation:
 
 `npm ci && npm run setup:assets && npm run fetch:footage && npm run check && npm run test:e2e`
 recreates the full verified state. Real-footage e2e tests are skipped if the footage is missing.
+
+## Live 3D garments (branch `dev/live-3d-garments`, 2026-09-26)
+
+Specification: `docs/CLAUDE_LIVE_3D_GARMENTS_PROMPT.md`.
+
+| Stage | Status | Notes |
+| --- | --- | --- |
+| 0. Baseline, assets, dependencies | ✅ | Baseline: check ✅, e2e 13/13. Assets moved with identical SHA-256 (`public/garments/3d/vneck/shirt-male.glb`, `assets/garments/vneck/source/*.fbx`, `SOURCE.md`). Installed three 0.186.1, @types/three 0.186.0, jolt-physics 1.1.0 and @gltf-transform/cli 4.5.0. |
+| 1. Real 3D garment path | ✅ | 2D/3D catalogue union; model loader with cache, stale-load guard and rig repair from the inverse bind matrices; dev inspection view; separate WebGL layer composited with the video transform; neutral fabric colours; 3D is the default; explicit failure state plus a labelled dev-only 2D fallback. |
+| 2. 3D tracking and retargeting | ✅ | Paired image+world landmarks through worker and fallback; weak-perspective fit; distributed spine, clavicles, aimed arms; quaternion smoothing; hold → neutral arms; resets; modest turns in 3D only. |
+| 3. Depth and occlusion | ✅ (approximate) | Depth-gated, soft-edged forearm cutouts starting past the sleeve. Physics colliders are separate. Crossed-arm footage was unavailable. |
+| 4. Cloth physics | ✅ experimental | Jolt soft body on a 1,007-particle topology proxy with skinned constraints, colliders, a fixed-step media clock, stability resets, an overload policy and dev tuning. Bounded secondary motion only. |
+| Verification and docs | ✅ | 106 unit tests, 20 dev + 7 production-preview e2e tests, visual review, performance table; README, RESEARCH, TESTING and LIMITATIONS updated. |
+
+Needs from the user:
+
+1. The Fab creator and licence label, for `assets/garments/vneck/SOURCE.md`.
+2. A physical-webcam session at the kiosk.
+3. Consented footage with crossed forearms and slow turns.

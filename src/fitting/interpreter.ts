@@ -117,8 +117,20 @@ export class TrackingInterpreter {
   private measuredRatio: number | null = null;
   private faceVisibility: number | null = null;
 
-  constructor(private readonly config: TrackingConfig) {
+  constructor(private config: TrackingConfig) {
     this.torsoRatio = config.defaultTorsoRatio;
+  }
+
+  /**
+   * Switches thresholds (2D garment vs. 3D garment turn limits). Learned state is kept; the new
+   * limits apply from the next observation.
+   */
+  setConfig(config: TrackingConfig): void {
+    this.config = config;
+  }
+
+  get activeConfig(): TrackingConfig {
+    return this.config;
   }
 
   /** Forget everything (seek, loop, source change, model change). */
@@ -393,7 +405,13 @@ export class TrackingInterpreter {
     }
 
     const tooClose = shoulderWidth > cfg.tooCloseShoulderFraction * obs.width;
-    const lengthBasis = Math.max(shoulderWidth, (this.refWidth ?? shoulderWidth) * 0.9);
+    // A turned torso shows narrower shoulders; in 3D mode undo that with the yaw estimate (bounded by
+    // the hide angle) so the length/width ratio still measures bending, not turning.
+    const frontalWidth = cfg.yawCompensatedWidth
+      ? shoulderWidth /
+        Math.max(Math.cos((yawDeg * Math.PI) / 180), Math.cos((cfg.yawHideDeg * Math.PI) / 180))
+      : shoulderWidth;
+    const lengthBasis = Math.max(frontalWidth, (this.refWidth ?? shoulderWidth) * 0.9);
     let torsoLength = lengthBasis * this.torsoRatio;
     let rotation = angle;
 

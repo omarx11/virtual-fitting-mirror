@@ -4,7 +4,7 @@
  * midpoint onto the wearer's, scale shoulder span to shoulder width and neck→hem to torso length
  * (with a clamped aspect change), and rotate with the shoulder line.
  */
-import type { GarmentDefinition, SleevePart } from '../garments/types';
+import type { Garment2DDefinition, SleevePart } from '../garments/types';
 import {
   applyToPoint,
   compose,
@@ -62,7 +62,7 @@ export function clampUserFit(fit: UserFitAdjustment): UserFitAdjustment {
 }
 
 export function computeGarmentPlacement(
-  garment: GarmentDefinition,
+  garment: Garment2DDefinition,
   pose: GarmentPose,
   userFit: UserFitAdjustment,
 ): GarmentPlacement {

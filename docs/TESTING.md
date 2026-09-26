@@ -5,7 +5,149 @@ RX 9070 XT** (driver 32.0.31041.1004; WebGL renderer "ANGLE (AMD … Direct3D11)
 Browser: Playwright Chromium 153.0.8010.12 (headless, real GPU via ANGLE/D3D11). The user's own video
 and a physical webcam were **not available** (see "Not verified").
 
-## Automated checks (all passing)
+## Live 3D garments (branch `dev/live-3d-garments`, 2026-09-26)
+
+Same machine and browser as below. Baseline before any change: `npm run check` ✅ (63 unit
+tests, lint clean, build OK) and `npm run test:e2e` ✅ 13/13. There were no pre-existing failures.
+
+### Automated checks after the change
+
+| Command | Result |
+| --- | --- |
+| `npm run check` (typecheck + Biome + Vitest + build) | ✅ 113 files lint-clean; **106 unit tests** in 12 files (63 existing + 43 new); build OK |
+| `npm run test:e2e` (dev server, Strict Mode) | ✅ **20 passed** (13 existing + 7 new), including 4 that use the downloaded footage |
+| `npm run test:e2e:preview` (production build + `vite preview`) | ✅ **7 passed**: GLB load, mode/asset switching, context loss, real footage + cloth, and three privacy tests |
+
+Nothing is skipped when `test-footage/` is present. Without it, the footage-based tests skip (they
+are marked so).
+
+### New automated coverage (what it proves)
+
+- **Landmark pairing/transfer** (`tracking3d.test.ts`):
+  - image and world landmarks are copied *before* `close()` and paired by person index;
+  - mismatched arrays give `world: null`, never a wrong pair;
+  - both buffers are transferred, and pairing survives `postMessage`-style cloning;
+  - worker and main-thread paths produce identical output (same copy function);
+  - a result arriving after a seek (stale generation) is dropped.
+- **Subject correspondence** (`fit3d.test.ts`): two people with changing result order; the world
+  pose used always belongs to the tracked subject.
+- **Rig and retargeting on the real GLB** (`modelLoader.test.ts`, `retargeter.test.ts`):
+  - one skinned mesh, 19 joints, and the full unweighted hierarchy is retained;
+  - the rest pose rebuilt from the inverse bind matrices reproduces the vertices (<0.1 mm);
+  - a neutral pose equals the bind pose;
+  - arm aiming reaches the target direction; parent-local = parent⁻¹ · world;
+  - raising the anatomical LEFT arm moves only the +X (wearer-left) sleeve;
+  - torso and sleeves stay connected, with bounded stretch at 90° abduction and no tearing at 150°;
+  - 200 random or degenerate targets give finite, normalized quaternions;
+  - thighs follow the pelvis.
+- **Coordinates and registration** (`fit3d.test.ts`):
+  - MediaPipe world → body axes; robust torso frames (near-collinear inputs, missing hips,
+    degenerate input);
+  - recovered yaw and lean; the fade toward the turn limit; the image-only fallback;
+  - low-confidence elbows;
+  - garment shoulder anchors land on the image shoulders (midpoint within 1 px, direction within 1°)
+    for turns, tilts, scales, portrait and landscape frames — and still do after the display
+    transform, with mirror on/off, contain/cover, 1080×1920 and 1600×900 viewports, and DPR 1 and 2.
+- **Filtering:**
+  - shortest-path quaternion slerp and bounded angular speed;
+  - opposite directions produce no NaN;
+  - a missing elbow holds, then fades to a neutral hanging arm with no snap;
+  - reset forgets motion.
+- **Turn limits** (`tracking3d.test.ts`):
+  - a 45° turn is followed in 3D but still rejected for 2D art;
+  - 85° stays hidden in 3D;
+  - the 2D thresholds are unchanged.
+- **Occlusion:**
+  - a forearm in front of the torso gives a depth-gated cutout that starts past the elbow;
+  - hanging arms or forearms behind the torso give none;
+  - low-confidence wrists give none.
+- **Physics** (`cloth.test.ts`, Node build of Jolt, deterministic media clock):
+  - a small-cloth proof: pinned vertices follow a moving skinned joint (<0.1 mm); free vertices
+    stay within max distance; stretch below 5% while hanging; no penetration of a moving capsule;
+  - the garment proxy has 1,007 particles, explicit seam welds, render mapping limited to connected
+    neighbours, and no particle spanning surfaces;
+  - real bounded motion: peak >5 mm and ≤ limit + 2 cm; pinned error <0.1 mm; free-edge stretch
+    p99 <1.3; only the initial reset;
+  - pause freezes the fabric with no catch-up burst;
+  - resets happen on backward time, a 3 s gap (no 180 catch-up steps) and reacquisition;
+  - runs are bit-identical for identical input;
+  - tuning rebuilds work, and disposal is idempotent.
+- **Browser (`garment3d.spec.ts`, `privacy.spec.ts`):**
+  - the GLB loads from `/garments/3d/vneck/shirt-male.glb` (HTTP 200) and is the default garment;
+  - in the inspection view the real model renders, and a *left* arm pose changes the image-right
+    region far more than the other side;
+  - 4× switching of garment, fabric and cloth on/off causes no errors and no tracker reload;
+  - WebGL unavailable gives an explicit error and the labelled 2D development fallback, and video
+    still works;
+  - WebGL context loss is reported and recovers;
+  - on real footage the garment visibly changes the torso region, and cloth runs with >500
+    particles and bounded deviation;
+  - with the 3D shirt and cloth active, the GLB and Jolt WASM load from localhost and **0 external
+    requests** are made (dev and production preview).
+
+### Visual review (real footage + deterministic poses)
+
+![Inspection poses: bind pose, left arm raised, both raised, arms forward, turn left 30°](images/3d-inspection-poses.png)
+
+The development inspection view (`/?inspect=3d`) shows five deterministic poses of the actual GLB:
+bind pose, wearer's left arm raised (appears on the image right: unmirrored), both raised, arms
+forward, and a 30° turn. Torso and sleeves deform as one connected mesh. The armpit stretch with
+raised arms is visible and documented.
+
+![Chest-up clip: before acquisition / tracked with arms raised](images/3d-upper-body-arms.png)
+
+*Left:* before the tracker has acquired the person (no garment; the original clothing is visible).
+*Right:* tracked chest-up frame with both arms raised; the sleeves follow the arms.
+
+![Mirrored portrait kiosk, cover crop, landmark + anchor overlay](images/3d-kiosk-mirrored-overlay.png)
+
+Mirrored 1080×1920 kiosk, cover crop, landmark overlay. The magenta garment shoulder anchors sit on
+the tracked shoulders (blue), so registration survives mirroring and cropping.
+
+Cases reviewed:
+
+| Case | Result |
+| --- | --- |
+| Neutral / arms at the sides | ✅ registered on shoulders; collar at the neck base after a calibration fix (it sat at the chin before) |
+| Left arm, right arm, both raised | ✅ sleeves follow independently; armpit stretch and "stubby" sleeves when hands are overhead |
+| Modest turns | ✅ in synthetic poses and the dance clip; ⚠️ no slow real turn footage |
+| Leaning / bending | ✅ lean follows (synthetic); bending over is hidden (existing rule) |
+| Toward/away movement | ⚠️ scale follows image lengths; only digital crops and burpees available |
+| Tracking loss and recovery | ✅ burpees and leave/re-enter: fades out, reacquires with a reset (cloth resets too) |
+| Crossed forearms (occlusion) | ⚠️ **no footage with forearms crossed in front of the chest**; synthetic tests only. On real clips the cutouts only touched forearms outside the garment; no torso holes |
+| Head dropped forward | ⚠️ the stand collar overlaps the chin (documented) |
+| Physical webcam | ❌ **not tested** (none connected); only Chromium's fake camera |
+
+### Performance (measured, not guaranteed)
+
+Headless Chromium 153, real GPU (AMD RX 9070 XT, ANGLE/D3D11), DPR 1, Full model on GPU in the
+worker, "Jumping jacks and burpees" (640×480, 30 fps), mirror on, cover framing. Values come from
+the in-app diagnostics after 16 s of playback. Canvas = visible canvas; render = WebGL garment
+layer. Timer resolution in the browser is ~0.1 ms.
+
+| Viewport | Mode | Build | Render/s | Inference/s | Inference ms (med/p95) | Pose age ms (med) | Garment render ms (med/p95) | Layer copy ms | Cloth solver ms (med/p95) | Canvas / render size |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1920×1080 | skeletal | dev | 29.7 | 29.8 | 16.7 / 23.4 | 33 | 0.2 / 0.3 | ≤0.1 | — | 1580×1080 / 1580×1185 |
+| 1920×1080 | cloth | dev | 29.6 | 30.0 | 15.0 / 24.4 | 33 | 3.0 / 4.0 | ≤0.1 | 1.4 / 2.0 (+0.7 mapping) | same |
+| 1080×1920 | skeletal | dev | 29.8 | 30.1 | 15.8 / 21.5 | 33 | 0.2 / 0.3 | ≤0.1 | — | 1080×1239 / 1652×1239 |
+| 1080×1920 | cloth | dev | 29.4 | 29.7 | 14.7 / 21.1 | 33 | 3.0 / 3.8 | ≤0.1 | 1.4 / 2.1 | same |
+| 1080×1920 | cloth | production | 30.1 | 30.0 | 15.6 / 24.8 | 33 | 3.0 / 3.6 | ≤0.1 | 1.4 / 2.1 | same |
+| 1920×1080 | skeletal | production (chest-up clip) | 29.9 | 29.6 | 15.1 / 21.7 | 33 | 0.2 / 0.3 | ≤0.1 | — | 1580×1080 / 1580×1185 |
+
+- Rendering runs once per presented video frame, so ~30 render/s *is* the source rate. This machine
+  reaches the 30 FPS target with a large margin.
+- The 14,079-triangle mesh is not a bottleneck (0.2 ms), so it was **not reduced**.
+- The first frame after load pays one-time shader compilation (~75–85 ms).
+- Cloth mode: 1,007 particles, 1 substep per 30 fps frame (2 at the 60 Hz fixed step when needed),
+  ~3 ms total including CPU skinning and normals. Up to 84 ms of media time was dropped in 16 s,
+  across reacquisitions; the solver never catches up.
+- JS heap after 16 s: 11–22 MB (production), 44–66 MB (dev).
+- Unit-test timings for the solver in Node: ~1.5–1.9 ms/frame.
+- The kiosk PC's own numbers are unknown until measured there (Diagnostics panel).
+
+## Original 2D prototype checks
+
+### Automated checks (all passing)
 
 | Command | Result |
 | --- | --- |
