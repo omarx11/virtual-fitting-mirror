@@ -540,6 +540,11 @@ input[type="range"] {
   color: #1b1210;
 }
 
+.badge-flat {
+  background: #3a414b;
+  color: var(--text);
+}
+
 .swatches {
   display: flex;
   flex-wrap: wrap;

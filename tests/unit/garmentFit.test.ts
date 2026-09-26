@@ -7,7 +7,7 @@ import {
 } from '../../src/fitting/garmentFit';
 import type { GarmentPose } from '../../src/fitting/smoother';
 import { armOutwardAngle } from '../../src/fitting/smoother';
-import { GARMENTS } from '../../src/garments/catalogue';
+import { findCard, GARMENT_CARDS, GARMENTS } from '../../src/garments/catalogue';
 import type { Garment2DDefinition } from '../../src/garments/types';
 import { applyToPoint } from '../../src/rendering/matrix';
 
@@ -151,5 +151,17 @@ describe('catalogue', () => {
       expect(g.supportedViews).toContain('front');
     }
     expect(ids.size).toBe(GARMENTS.length);
+  });
+
+  it('folds the 2D garments into one picker card and gives every garment exactly one card', () => {
+    const flat = GARMENTS.filter((g) => g.kind === '2d');
+    const flatCards = GARMENT_CARDS.filter((c) => c.kind === '2d');
+    expect(flatCards).toHaveLength(1);
+    expect(flatCards[0]?.garmentIds).toEqual(flat.map((g) => g.id));
+    for (const g of GARMENTS) {
+      expect(GARMENT_CARDS.filter((c) => c.garmentIds.includes(g.id))).toHaveLength(1);
+      expect(findCard(g.id).garmentIds).toContain(g.id);
+      if (g.kind === '2d') expect(g.swatch.label).toBeTruthy();
+    }
   });
 });

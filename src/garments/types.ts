@@ -75,6 +75,12 @@ export interface Garment2DDefinition extends GarmentBase {
     hem: NormPoint;
   };
   fit: GarmentFitDefaults;
+  /** Colour option shown for this artwork when the 2D garments are grouped into one picker card. */
+  swatch: {
+    label: string;
+    /** CSS background (solid colour or gradient). */
+    color: string;
+  };
 }
 
 /** Selectable fabric colour/finish. No texture maps: none matching the model were supplied. */

@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react';
 import type { Garment3DStatus } from '../app/MirrorEngine';
-import { findMaterial } from '../garments/catalogue';
-import type { GarmentDefinition } from '../garments/types';
+import { findCard, findMaterial, GARMENT_CARDS } from '../garments/catalogue';
+import type { Garment2DDefinition, GarmentDefinition } from '../garments/types';
 
 export function GarmentPicker({
   garments,
@@ -21,24 +22,46 @@ export function GarmentPicker({
 }) {
   const selected = garments.find((g) => g.id === selectedId);
   const material = selected?.kind === '3d' ? findMaterial(selected, materialId) : null;
+  const selectedCard = findCard(selectedId);
+  // Remember the last colour chosen on a multi-colour card so re-selecting the card restores it.
+  const lastChoice = useRef(new Map<string, string>());
+  useEffect(() => {
+    lastChoice.current.set(selectedCard.id, selectedId);
+  }, [selectedCard.id, selectedId]);
+  const flatVariants =
+    selected?.kind === '2d'
+      ? selectedCard.garmentIds
+          .map((id) => garments.find((g) => g.id === id))
+          .filter((g): g is Garment2DDefinition => g?.kind === '2d')
+      : [];
   return (
     <fieldset className="garments">
       <legend className="section-title">Shirts</legend>
       <div className="garment-grid">
-        {garments.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            className="garment"
-            aria-pressed={g.id === selectedId}
-            onClick={() => onSelect(g.id)}
-            title={g.description}
-          >
-            <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
-            <span>{g.name}</span>
-            {g.kind === '3d' && <span className="badge">3D</span>}
-          </button>
-        ))}
+        {GARMENT_CARDS.map((card) => {
+          const active = card.id === selectedCard.id;
+          const shownId = active ? selectedId : (lastChoice.current.get(card.id) ?? card.garmentIds[0]);
+          const shown = garments.find((g) => g.id === shownId);
+          if (!shown) return null;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              className="garment"
+              aria-pressed={active}
+              onClick={() => {
+                if (!active) onSelect(shown.id);
+              }}
+              title={card.description}
+            >
+              <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
+              <span>{card.name}</span>
+              <span className={card.kind === '3d' ? 'badge' : 'badge badge-flat'}>
+                {card.kind === '3d' ? '3D' : '2D'}
+              </span>
+            </button>
+          );
+        })}
       </div>
       {selected?.kind === '3d' && (
         <div className="swatches" role="radiogroup" aria-label="Fabric colour">
@@ -55,6 +78,25 @@ export function GarmentPicker({
             >
               <span className="swatch-chip" style={{ background: m.color }} aria-hidden />
               <span>{m.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {flatVariants.length > 1 && (
+        <div className="swatches" role="radiogroup" aria-label="Shirt colour">
+          {flatVariants.map((g) => (
+            // biome-ignore lint/a11y/useSemanticElements: a styled swatch button with radio semantics.
+            <button
+              key={g.id}
+              type="button"
+              role="radio"
+              aria-checked={g.id === selectedId}
+              className="swatch"
+              title={`${g.name} — ${g.description}`}
+              onClick={() => onSelect(g.id)}
+            >
+              <span className="swatch-chip" style={{ background: g.swatch.color }} aria-hidden />
+              <span>{g.swatch.label}</span>
             </button>
           ))}
         </div>

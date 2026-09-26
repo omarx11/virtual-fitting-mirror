@@ -10,3 +10,5 @@ test-footage/*
 test-results/
 playwright-report/
 .vite/
+# Local prompt notes; not committed.
+docs/prompts.txt

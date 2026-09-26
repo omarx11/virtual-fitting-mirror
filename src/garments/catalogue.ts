@@ -50,6 +50,7 @@ function demoGarment(
   id: string,
   name: string,
   description: string,
+  swatch: Garment2DDefinition['swatch'],
   fit?: Partial<Garment2DDefinition['fit']>,
 ): Garment2DDefinition {
   return {
@@ -65,6 +66,7 @@ function demoGarment(
     supportedViews: ['front'],
     license: DEMO_LICENSE,
     demo: true,
+    swatch,
   };
 }
 
@@ -100,11 +102,64 @@ export const VNECK_3D: Garment3DDefinition = {
 
 export const GARMENTS: readonly GarmentDefinition[] = [
   VNECK_3D,
-  demoGarment('coral-crew-tee', 'Coral crew tee', 'Solid crew-neck T-shirt'),
-  demoGarment('breton-stripe-tee', 'Breton stripe', 'Striped boat-neck top'),
-  demoGarment('chambray-button-shirt', 'Chambray shirt', 'Short-sleeve button-up with collar'),
-  demoGarment('forest-v-neck', 'Forest V-neck', 'V-neck T-shirt'),
+  demoGarment('coral-crew-tee', 'Coral crew tee', 'Solid crew-neck T-shirt', {
+    label: 'Coral',
+    color: '#e8735f',
+  }),
+  demoGarment('breton-stripe-tee', 'Breton stripe', 'Striped boat-neck top', {
+    label: 'Breton stripe',
+    color: 'repeating-linear-gradient(180deg, #f4f1e8 0 4px, #1f2e5a 4px 7px)',
+  }),
+  demoGarment('chambray-button-shirt', 'Chambray shirt', 'Short-sleeve button-up with collar', {
+    label: 'Chambray',
+    color: '#6f95c2',
+  }),
+  demoGarment('forest-v-neck', 'Forest V-neck', 'V-neck T-shirt', { label: 'Forest', color: '#3f6b4f' }),
 ];
+
+/**
+ * Picker cards. Each 3D garment is its own card; the 2D demo garments are folded into a single
+ * "Shirt (2D)" card whose colour swatches choose between their artworks.
+ */
+export interface GarmentCard {
+  id: string;
+  kind: GarmentDefinition['kind'];
+  name: string;
+  description: string;
+  /** Catalogue garments selectable from this card (the first is the card's default). */
+  garmentIds: readonly string[];
+}
+
+const FLAT_GARMENTS = GARMENTS.filter((g): g is Garment2DDefinition => g.kind === '2d');
+
+export const GARMENT_CARDS: readonly GarmentCard[] = [
+  ...GARMENTS.filter(isGarment3D).map((g) => ({
+    id: g.id,
+    kind: g.kind,
+    name: g.name,
+    description: g.description,
+    garmentIds: [g.id],
+  })),
+  ...(FLAT_GARMENTS.length
+    ? [
+        {
+          id: 'shirt-2d',
+          kind: '2d' as const,
+          name: 'Shirt (2D)',
+          description: 'Flat demo artwork in several colours (legacy 2D comparison)',
+          garmentIds: FLAT_GARMENTS.map((g) => g.id),
+        },
+      ]
+    : []),
+];
+
+/** The picker card that contains a catalogue garment. */
+export function findCard(garmentId: string): GarmentCard {
+  const id = findGarment(garmentId).id;
+  const card = GARMENT_CARDS.find((c) => c.garmentIds.includes(id)) ?? GARMENT_CARDS[0];
+  if (!card) throw new Error('Garment catalogue is empty');
+  return card;
+}
 
 export const DEFAULT_GARMENT_ID = GARMENTS[0]?.id ?? '';
 

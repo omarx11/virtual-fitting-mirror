@@ -6,7 +6,7 @@ import { SourceControls } from '../components/SourceControls';
 import { StageOverlay } from '../components/StageOverlay';
 import { Transport } from '../components/Transport';
 import { ViewControls } from '../components/ViewControls';
-import { findGarment, GARMENTS } from '../garments/catalogue';
+import { findCard, findGarment, GARMENT_CARDS, GARMENTS } from '../garments/catalogue';
 import type { EngineSettings } from './MirrorEngine';
 import { loadPreferences, type Preferences, savePreferences } from './preferences';
 import { useMirrorEngine } from './useMirrorEngine';
@@ -51,9 +51,11 @@ export function App() {
 
   const selectGarmentOffset = useCallback(
     (delta: number) => {
-      const index = GARMENTS.findIndex((g) => g.id === prefs.garmentId);
-      const next = GARMENTS[(index + delta + GARMENTS.length) % GARMENTS.length];
-      if (next) update({ garmentId: next.id });
+      // Steps through picker cards (the 2D colours share one card).
+      const index = GARMENT_CARDS.indexOf(findCard(prefs.garmentId));
+      const next = GARMENT_CARDS[(index + delta + GARMENT_CARDS.length) % GARMENT_CARDS.length];
+      const id = next?.garmentIds[0];
+      if (id) update({ garmentId: id });
     },
     [prefs.garmentId, update],
   );

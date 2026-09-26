@@ -116,8 +116,9 @@ test.describe('3D garment', () => {
     await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
     const initMs = (await snap(page)).tracker.info?.initMs;
     for (let i = 0; i < 4; i++) {
-      await page.getByRole('button', { name: /Breton stripe/ }).click();
+      await page.getByRole('button', { name: /Shirt \(2D\)/ }).click();
       await expect.poll(async () => (await g3(page)).status.state).toBe('inactive');
+      await page.getByRole('radio', { name: i % 2 ? 'Chambray' : 'Breton stripe' }).click();
       await page.getByRole('button', { name: /V-neck \(3D\)/ }).click();
       await expect.poll(async () => (await g3(page)).status.state).toBe('ready');
       await page.getByRole('radio', { name: i % 2 ? 'Navy' : 'Olive' }).click();

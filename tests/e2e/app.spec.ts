@@ -69,8 +69,10 @@ test.describe('local video file', () => {
 
     // Garment switch while paused: selection changes, no model reload, no new timeline.
     const genBefore = (await snap(page)).diagnostics.generation;
-    await page.getByRole('button', { name: /Breton stripe/ }).click();
-    await expect(page.getByRole('button', { name: /Breton stripe/ })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: /Shirt \(2D\)/ }).click();
+    await expect(page.getByRole('button', { name: /Shirt \(2D\)/ })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('radio', { name: 'Breton stripe' }).click();
+    await expect(page.getByRole('radio', { name: 'Breton stripe' })).toHaveAttribute('aria-checked', 'true');
     let s = await snap(page);
     expect(s.tracker.info?.initMs).toBe(initMs);
     expect(s.diagnostics.generation).toBe(genBefore);
@@ -86,10 +88,7 @@ test.describe('local video file', () => {
     await page.getByRole('button', { name: 'Play' }).click();
     await expect.poll(async () => (await snap(page)).playback.paused).toBe(false);
     await page.keyboard.press(']');
-    await expect(page.getByRole('button', { name: /Chambray shirt/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(page.getByRole('button', { name: /V-neck \(3D\)/ })).toHaveAttribute('aria-pressed', 'true');
     s = await snap(page);
     expect(s.tracker.info?.initMs).toBe(initMs);
 
