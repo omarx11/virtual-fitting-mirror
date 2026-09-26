@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original demo artwork for virtual-fitting-mirror (CC0-1.0). Anchors: see src/garments/catalogue.ts -->
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img">
+  <title>Forest V-neck (demo garment body)</title>
+  <defs>
+    
+    <linearGradient id="forest-v-neck-side" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#2a4a36"/>
+      <stop offset="0.22" stop-color="#3f6b4f"/>
+      <stop offset="0.5" stop-color="#548866"/>
+      <stop offset="0.78" stop-color="#3f6b4f"/>
+      <stop offset="1" stop-color="#2a4a36"/>
+    </linearGradient>
+    <linearGradient id="forest-v-neck-drop" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#000" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <clipPath id="forest-v-neck-clip"><path d="M 244 92 L 300 205 L 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z"/></clipPath>
+  </defs>
+  <path d="M 244 92 L 300 205 L 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="url(#forest-v-neck-side)"/>
+  
+  <g clip-path="url(#forest-v-neck-clip)">
+    
+  <g fill="none" stroke="#000" stroke-linecap="round" opacity="0.10" stroke-width="5">
+    <path d="M 200 300 Q 215 420 205 560"/>
+    <path d="M 405 320 Q 392 430 400 580"/>
+    <path d="M 250 560 Q 300 585 350 562"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" opacity="0.10" stroke-width="4">
+    <path d="M 300 240 Q 305 400 296 620"/>
+  </g>
+    <rect width="600" height="720" fill="url(#forest-v-neck-drop)"/>
+    <path d="M 175 660 Q 300 680 425 660" fill="none" stroke="#2a4a36" stroke-width="6" opacity="0.6"/>
+  </g>
+  <path d="M 244 92 L 300 205 L 356 92" fill="none" stroke="#2f5540" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <path d="M 244 92 L 300 205 L 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="none" stroke="#2a4a36" stroke-width="2" opacity="0.5"/>
+</svg>

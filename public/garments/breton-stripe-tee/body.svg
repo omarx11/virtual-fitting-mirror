@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original demo artwork for virtual-fitting-mirror (CC0-1.0). Anchors: see src/garments/catalogue.ts -->
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img">
+  <title>Breton stripe (demo garment body)</title>
+  <defs>
+    
+    <linearGradient id="breton-stripe-tee-side" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#cfcabb"/>
+      <stop offset="0.22" stop-color="#f4f1e8"/>
+      <stop offset="0.5" stop-color="#ffffff"/>
+      <stop offset="0.78" stop-color="#f4f1e8"/>
+      <stop offset="1" stop-color="#cfcabb"/>
+    </linearGradient>
+    <linearGradient id="breton-stripe-tee-drop" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#000" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <clipPath id="breton-stripe-tee-clip"><path d="M 222 92 Q 300 127.1 378 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z"/></clipPath>
+  </defs>
+  <path d="M 222 92 Q 300 127.1 378 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="url(#breton-stripe-tee-side)"/>
+  
+      <pattern id="stripes" width="600" height="44" patternUnits="userSpaceOnUse">
+        <rect y="22" width="600" height="16" fill="#1f2e5a"/>
+      </pattern>
+      <rect x="0" y="175" width="600" height="545" fill="url(#stripes)" clip-path="url(#breton-stripe-tee-clip)" opacity="0.92"/>
+  <g clip-path="url(#breton-stripe-tee-clip)">
+    
+  <g fill="none" stroke="#000" stroke-linecap="round" opacity="0.10" stroke-width="5">
+    <path d="M 200 300 Q 215 420 205 560"/>
+    <path d="M 405 320 Q 392 430 400 580"/>
+    <path d="M 250 560 Q 300 585 350 562"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" opacity="0.10" stroke-width="4">
+    <path d="M 300 240 Q 305 400 296 620"/>
+  </g>
+    <rect width="600" height="720" fill="url(#breton-stripe-tee-drop)"/>
+    <path d="M 175 660 Q 300 680 425 660" fill="none" stroke="#cfcabb" stroke-width="6" opacity="0.6"/>
+  </g>
+  <path d="M 222 92 Q 300 127 378 92" fill="none" stroke="#1f2e5a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <path d="M 222 92 Q 300 127.1 378 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="none" stroke="#cfcabb" stroke-width="2" opacity="0.5"/>
+</svg>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original demo artwork for virtual-fitting-mirror (CC0-1.0). Anchors: see src/garments/catalogue.ts -->
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img">
+  <title>Chambray shirt (demo garment body)</title>
+  <defs>
+    
+    <linearGradient id="chambray-button-shirt-side" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#4d6f99"/>
+      <stop offset="0.22" stop-color="#6f95c2"/>
+      <stop offset="0.5" stop-color="#8fb0d6"/>
+      <stop offset="0.78" stop-color="#6f95c2"/>
+      <stop offset="1" stop-color="#4d6f99"/>
+    </linearGradient>
+    <linearGradient id="chambray-button-shirt-drop" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#000" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <clipPath id="chambray-button-shirt-clip"><path d="M 250 92 Q 300 119 350 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z"/></clipPath>
+  </defs>
+  <path d="M 250 92 Q 300 119 350 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="url(#chambray-button-shirt-side)"/>
+  
+  <g clip-path="url(#chambray-button-shirt-clip)">
+    
+  <g fill="none" stroke="#000" stroke-linecap="round" opacity="0.10" stroke-width="5">
+    <path d="M 200 300 Q 215 420 205 560"/>
+    <path d="M 405 320 Q 392 430 400 580"/>
+    <path d="M 250 560 Q 300 585 350 562"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" opacity="0.10" stroke-width="4">
+    <path d="M 300 240 Q 305 400 296 620"/>
+  </g>
+    <rect width="600" height="720" fill="url(#chambray-button-shirt-drop)"/>
+    <path d="M 175 660 Q 300 680 425 660" fill="none" stroke="#4d6f99" stroke-width="6" opacity="0.6"/>
+  </g>
+  
+  
+      <path d="M 250 92 L 300 150 L 262 176 L 228 104 Z" fill="#8fb0d6" stroke="#56779f" stroke-width="3"/>
+      <path d="M 350 92 L 300 150 L 338 176 L 372 104 Z" fill="#8fb0d6" stroke="#56779f" stroke-width="3"/>
+      <rect x="289" y="150" width="22" height="528" fill="#6f95c2" stroke="#56779f" stroke-width="2.5"/>
+      <circle cx="300" cy="200" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/><circle cx="300" cy="290" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/><circle cx="300" cy="380" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/><circle cx="300" cy="470" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/><circle cx="300" cy="560" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/><circle cx="300" cy="640" r="6.5" fill="#f5f2ea" stroke="#9aa3ad" stroke-width="1.5"/>
+      <path d="M 355 250 L 405 250 L 405 305 Q 380 318 355 305 Z" fill="none" stroke="#56779f" stroke-width="3"/>
+      <line x1="355" y1="262" x2="405" y2="262" stroke="#56779f" stroke-width="2.5"/>
+  <path d="M 250 92 Q 300 119 350 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="none" stroke="#4d6f99" stroke-width="2" opacity="0.5"/>
+</svg>

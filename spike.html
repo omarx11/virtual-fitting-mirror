@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><title>Tracking spike</title></head>
+  <body style="background:#111;color:#eee;font:14px system-ui">
+    <p>Technical spike (not part of the app): worker + delegate + timing check.</p>
+    <input type="file" id="file" accept="video/*" />
+    <select id="delegate"><option>GPU</option><option>CPU</option></select>
+    <select id="backend"><option>worker</option><option>main-thread</option></select>
+    <select id="model"><option>lite</option><option>full</option></select>
+    <pre id="log"></pre>
+    <canvas id="c" style="max-width:100%"></canvas>
+    <video id="v" muted playsinline style="display:none"></video>
+    <script type="module" src="/src/spike.ts"></script>
+  </body>
+</html>

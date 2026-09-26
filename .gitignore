@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+# Downloaded by `npm run setup:assets` (sha256-verified); not committed.
+public/models/*.task
+# Local test footage (third-party licensed clips, see test-footage/SOURCES.md) — not committed.
+test-footage/*
+!test-footage/SOURCES.md
+!test-footage/fetch-footage.mjs
+test-results/
+playwright-report/
+.vite/

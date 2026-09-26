@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original demo artwork for virtual-fitting-mirror (CC0-1.0). Pivot (100,22), axis +y. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170" role="img">
+  <title>Forest V-neck (demo right sleeve)</title>
+  <defs>
+    <linearGradient id="forest-v-neck-right-sg" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#548866"/>
+      <stop offset="0.55" stop-color="#3f6b4f"/>
+      <stop offset="1" stop-color="#2a4a36"/>
+    </linearGradient>
+    <clipPath id="forest-v-neck-right-sclip"><path d="M 54 32 Q 100 2 146 32 L 139 119 Q 100 131 61 119 Z"/></clipPath>
+  </defs>
+  <g transform="translate(200 0) scale(-1 1)">
+    <path d="M 54 32 Q 100 2 146 32 L 139 119 Q 100 131 61 119 Z" fill="url(#forest-v-neck-right-sg)"/>
+    
+    <path d="M 62 112 Q 100 124 138 112" fill="none" stroke="#2f5540" stroke-width="6" opacity="0.8"/>
+    <path d="M 54 32 Q 100 2 146 32 L 139 119 Q 100 131 61 119 Z" fill="none" stroke="#2a4a36" stroke-width="2" opacity="0.5"/>
+  </g>
+</svg>

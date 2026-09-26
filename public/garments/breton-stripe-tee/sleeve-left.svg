@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original demo artwork for virtual-fitting-mirror (CC0-1.0). Pivot (100,22), axis +y. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170" role="img">
+  <title>Breton stripe (demo left sleeve)</title>
+  <defs>
+    <linearGradient id="breton-stripe-tee-left-sg" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#f4f1e8"/>
+      <stop offset="1" stop-color="#cfcabb"/>
+    </linearGradient>
+    <clipPath id="breton-stripe-tee-left-sclip"><path d="M 54 32 Q 100 2 146 32 L 139 135 Q 100 147 61 135 Z"/></clipPath>
+  </defs>
+  <g>
+    <path d="M 54 32 Q 100 2 146 32 L 139 135 Q 100 147 61 135 Z" fill="url(#breton-stripe-tee-left-sg)"/>
+    
+      <pattern id="sstripes" width="200" height="44" patternUnits="userSpaceOnUse">
+        <rect y="22" width="200" height="16" fill="#1f2e5a"/>
+      </pattern>
+      <rect x="0" y="40" width="200" height="130" fill="url(#sstripes)" clip-path="url(#breton-stripe-tee-left-sclip)" opacity="0.92"/>
+    <path d="M 62 128 Q 100 140 138 128" fill="none" stroke="#1f2e5a" stroke-width="6" opacity="0.8"/>
+    <path d="M 54 32 Q 100 2 146 32 L 139 135 Q 100 147 61 135 Z" fill="none" stroke="#cfcabb" stroke-width="2" opacity="0.5"/>
+  </g>
+</svg>

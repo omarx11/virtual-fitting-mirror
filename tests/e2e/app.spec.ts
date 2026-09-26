@@ -1,0 +1,182 @@
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
+import { collectErrors, currentTime, FIXTURES, openApp, openFile, snap, waitForTracker } from './helpers';
+
+const pattern = join(FIXTURES, 'synthetic-pattern.webm');
+
+test.describe('app shell and tracker', () => {
+  test('loads, starts the tracker in a worker, and cleans up the Strict Mode double mount', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    await openApp(page);
+    await expect(page.getByRole('heading', { name: 'Virtual fitting mirror' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open a video file' })).toBeVisible();
+    await waitForTracker(page);
+    const s = await snap(page);
+    expect(s.tracker.backend).toBe('worker');
+    // React Strict Mode mounts twice in development; the first engine's worker must be gone.
+    await expect.poll(() => page.workers().length, { timeout: 5000 }).toBe(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('model download failure shows an actionable error and Retry recovers', async ({ page }) => {
+    await page.route('**/models/*.task', (route) => route.fulfill({ status: 404, body: 'missing' }));
+    await openApp(page);
+    await waitForTracker(page, 'error');
+    expect((await snap(page)).tracker.kind).toBe('model-missing');
+    await expect(page.getByText(/setup:assets/)).toBeVisible();
+    // The rest of the app keeps working without tracking.
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+    await expect(page.getByTestId('status')).toContainText('Tracking unavailable');
+    await page.unroute('**/models/*.task');
+    await page.getByTestId('status').getByRole('button', { name: 'Retry' }).click();
+    await waitForTracker(page);
+  });
+});
+
+test.describe('local video file', () => {
+  test('plays, pauses, seeks, restarts, loops and switches garments without reloading the model', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    await openApp(page, { mirror: false });
+    await waitForTracker(page);
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+    const s0 = await snap(page);
+    expect(s0.source.width).toBe(320);
+    expect(s0.source.height).toBe(240);
+    expect(s0.playback.loop).toBe(true);
+    const initMs = s0.tracker.info?.initMs;
+
+    // Playing → frames are inferred (no person in this synthetic clip).
+    await expect
+      .poll(async () => (await snap(page)).diagnostics.scheduler?.completed ?? 0)
+      .toBeGreaterThan(5);
+    await expect(page.getByTestId('status')).toContainText('Step into view');
+
+    // Pause.
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await expect.poll(async () => (await snap(page)).playback.paused).toBe(true);
+
+    // Paused: no continuous duplicate inference.
+    const pausedA = (await snap(page)).diagnostics.scheduler?.submitted ?? 0;
+    await page.waitForTimeout(700);
+    const pausedB = (await snap(page)).diagnostics.scheduler?.submitted ?? 0;
+    expect(pausedB - pausedA).toBeLessThanOrEqual(1);
+
+    // Garment switch while paused: selection changes, no model reload, no new timeline.
+    const genBefore = (await snap(page)).diagnostics.generation;
+    await page.getByRole('button', { name: /Breton stripe/ }).click();
+    await expect(page.getByRole('button', { name: /Breton stripe/ })).toHaveAttribute('aria-pressed', 'true');
+    let s = await snap(page);
+    expect(s.tracker.info?.initMs).toBe(initMs);
+    expect(s.diagnostics.generation).toBe(genBefore);
+
+    // Seek backwards while paused → new generation, still no errors.
+    await page.evaluate(() =>
+      (window as unknown as { __mirror: { seek(t: number): void } }).__mirror.seek(0.5),
+    );
+    await expect.poll(async () => (await snap(page)).diagnostics.generation).toBeGreaterThan(genBefore);
+    await expect.poll(() => currentTime(page)).toBeCloseTo(0.5, 1);
+
+    // Play again, switch garment while playing.
+    await page.getByRole('button', { name: 'Play' }).click();
+    await expect.poll(async () => (await snap(page)).playback.paused).toBe(false);
+    await page.keyboard.press(']');
+    await expect(page.getByRole('button', { name: /Chambray shirt/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    s = await snap(page);
+    expect(s.tracker.info?.initMs).toBe(initMs);
+
+    // Loop: the 4 s clip wraps around without timestamp errors.
+    const genBeforeLoop = s.diagnostics.generation;
+    await expect
+      .poll(async () => (await snap(page)).diagnostics.generation, { timeout: 8000 })
+      .toBeGreaterThan(genBeforeLoop);
+    expect((await snap(page)).playback.ended).toBe(false);
+
+    // Restart.
+    await page.getByRole('button', { name: 'Restart' }).click();
+    await expect.poll(() => currentTime(page)).toBeLessThan(1.5);
+
+    // Loop off → ends.
+    await page.getByRole('button', { name: 'Loop' }).click();
+    await expect.poll(async () => (await snap(page)).playback.loop).toBe(false);
+    await expect.poll(async () => (await snap(page)).playback.ended, { timeout: 8000 }).toBe(true);
+
+    expect((await snap(page)).diagnostics.scheduler?.errors).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('rejects an undecodable file with an explanation and stays usable', async ({ page }) => {
+    await openApp(page);
+    await openFile(page, join(FIXTURES, 'not-a-video.mp4'));
+    await expect.poll(async () => (await snap(page)).source.state).toBe('error');
+    await expect(page.getByRole('alert').first()).toContainText(/cannot play|could not be decoded|MP4|WebM/i);
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+  });
+
+  test('mirror, framing, fullscreen-safe resize and portrait viewport keep a valid canvas', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    await openApp(page, { mirror: true });
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+    await page.keyboard.press('m');
+    await page.selectOption('.view-controls select', 'cover');
+    for (const vp of [
+      { width: 1080, height: 1920 },
+      { width: 390, height: 844 },
+      { width: 1600, height: 900 },
+    ]) {
+      await page.setViewportSize(vp);
+      await expect
+        .poll(async () => {
+          const c = (await snap(page)).diagnostics.canvasSize;
+          const box = await page.locator('.stage').boundingBox();
+          return box ? Math.abs(c.width - Math.round(box.width)) <= 2 : false;
+        })
+        .toBe(true);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('controls are keyboard reachable with visible labels', async ({ page }) => {
+    await openApp(page);
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+    for (const name of ['Pause', 'Restart', 'Loop', 'Shirt', 'Mirror', 'Fullscreen', 'Reset fit']) {
+      await expect(page.getByRole('button', { name: new RegExp(name) }).first()).toBeVisible();
+    }
+    await expect(page.getByRole('slider', { name: 'Size' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Height' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Seek' })).toBeVisible();
+    // Tab reaches a garment button.
+    let found = false;
+    for (let i = 0; i < 25 && !found; i++) {
+      await page.keyboard.press('Tab');
+      found = await page.evaluate(() => document.activeElement?.classList.contains('garment') ?? false);
+    }
+    expect(found).toBe(true);
+  });
+});
+
+test.describe('camera', () => {
+  test('no camera / denied: explains the problem and video mode still works', async ({ page }) => {
+    await openApp(page);
+    await page.getByRole('button', { name: 'Use camera' }).click();
+    await expect.poll(async () => (await snap(page)).source.state).toBe('error');
+    const s = await snap(page);
+    expect(['no-camera', 'permission-denied', 'camera-busy', 'unknown']).toContain(s.source.errorKind);
+    await expect(page.getByRole('alert').first()).toBeVisible();
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+  });
+});

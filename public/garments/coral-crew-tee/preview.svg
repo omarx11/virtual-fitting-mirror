@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="-30 40 660 660" preserveAspectRatio="xMidYMid meet" role="img">
+  <title>Coral crew tee</title>
+  <g transform="translate(425 120) rotate(-22) translate(-100 -22)"><svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170" role="img">
+  <title>Coral crew tee (demo left sleeve)</title>
+  <defs>
+    <linearGradient id="coral-crew-tee-left-sg" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#f28e7b"/>
+      <stop offset="0.55" stop-color="#e8735f"/>
+      <stop offset="1" stop-color="#b8503f"/>
+    </linearGradient>
+    <clipPath id="coral-crew-tee-left-sclip"><path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z"/></clipPath>
+  </defs>
+  <g>
+    <path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z" fill="url(#coral-crew-tee-left-sg)"/>
+    
+    <path d="M 62 114 Q 100 126 138 114" fill="none" stroke="#c95a48" stroke-width="6" opacity="0.8"/>
+    <path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z" fill="none" stroke="#b8503f" stroke-width="2" opacity="0.5"/>
+  </g>
+</svg>
+</g>
+  <g transform="translate(175 120) rotate(22) translate(-100 -22)"><svg xmlns="http://www.w3.org/2000/svg" width="200" height="170" viewBox="0 0 200 170" role="img">
+  <title>Coral crew tee (demo right sleeve)</title>
+  <defs>
+    <linearGradient id="coral-crew-tee-right-sg" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#f28e7b"/>
+      <stop offset="0.55" stop-color="#e8735f"/>
+      <stop offset="1" stop-color="#b8503f"/>
+    </linearGradient>
+    <clipPath id="coral-crew-tee-right-sclip"><path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z"/></clipPath>
+  </defs>
+  <g transform="translate(200 0) scale(-1 1)">
+    <path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z" fill="url(#coral-crew-tee-right-sg)"/>
+    
+    <path d="M 62 114 Q 100 126 138 114" fill="none" stroke="#c95a48" stroke-width="6" opacity="0.8"/>
+    <path d="M 54 32 Q 100 2 146 32 L 139 121 Q 100 133 61 121 Z" fill="none" stroke="#b8503f" stroke-width="2" opacity="0.5"/>
+  </g>
+</svg>
+</g>
+  <svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img">
+  <title>Coral crew tee (demo garment body)</title>
+  <defs>
+    
+    <linearGradient id="coral-crew-tee-side" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#b8503f"/>
+      <stop offset="0.22" stop-color="#e8735f"/>
+      <stop offset="0.5" stop-color="#f28e7b"/>
+      <stop offset="0.78" stop-color="#e8735f"/>
+      <stop offset="1" stop-color="#b8503f"/>
+    </linearGradient>
+    <linearGradient id="coral-crew-tee-drop" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#000" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <clipPath id="coral-crew-tee-clip"><path d="M 244 92 Q 300 159.5 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z"/></clipPath>
+  </defs>
+  <path d="M 244 92 Q 300 159.5 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="url(#coral-crew-tee-side)"/>
+  
+  <g clip-path="url(#coral-crew-tee-clip)">
+    
+  <g fill="none" stroke="#000" stroke-linecap="round" opacity="0.10" stroke-width="5">
+    <path d="M 200 300 Q 215 420 205 560"/>
+    <path d="M 405 320 Q 392 430 400 580"/>
+    <path d="M 250 560 Q 300 585 350 562"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-linecap="round" opacity="0.10" stroke-width="4">
+    <path d="M 300 240 Q 305 400 296 620"/>
+  </g>
+    <rect width="600" height="720" fill="url(#coral-crew-tee-drop)"/>
+    <path d="M 175 660 Q 300 680 425 660" fill="none" stroke="#b8503f" stroke-width="6" opacity="0.6"/>
+  </g>
+  <path d="M 244 92 Q 300 160 356 92" fill="none" stroke="#c95a48" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <path d="M 244 92 Q 300 159.5 356 92 L 425 118 Q 446 124 448 150 Q 440 205 434 252 Q 424 380 419 470 Q 417 580 421 668 Q 300 686 179 668 Q 183 580 181 470 Q 176 380 166 252 Q 160 205 152 150 Q 154 124 175 118 Z" fill="none" stroke="#b8503f" stroke-width="2" opacity="0.5"/>
+</svg>
+
+</svg>
