@@ -6,6 +6,7 @@
 
 import { type CapturedImage, captureVideoFrame } from '../ai/capture';
 import {
+  DEFAULT_PRESET,
   type DelegatePreference,
   MAIN_THREAD_FALLBACK_HZ,
   QUALITY_PRESETS,
@@ -30,7 +31,7 @@ import {
 import { type PoseObservation, toObservation } from '../fitting/observation';
 import { type ForearmCutout, forearmCutouts } from '../fitting/occlusion';
 import { type GarmentPose, PoseSmoother } from '../fitting/smoother';
-import { findGarment, findMaterial, GARMENTS, isGarment3D } from '../garments/catalogue';
+import { DEFAULT_GARMENT_ID, findGarment, findMaterial, GARMENTS, isGarment3D } from '../garments/catalogue';
 import { GarmentLibrary } from '../garments/loader';
 import { GarmentModelCache, type PreparedGarmentModel } from '../garments/modelLoader';
 import type { Garment2DDefinition, Garment3DDefinition } from '../garments/types';
@@ -167,7 +168,7 @@ export interface EngineSnapshot {
 }
 
 export const DEFAULT_SETTINGS: EngineSettings = {
-  garmentId: GARMENTS[0]?.id ?? '',
+  garmentId: DEFAULT_GARMENT_ID,
   materialId: '',
   motion: 'skeletal',
   showGarment: true,
@@ -177,7 +178,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   showLandmarks: false,
   // Experimental and not validated on real crossed-arm footage, so off by default.
   occlusion: false,
-  preset: 'balanced',
+  preset: DEFAULT_PRESET,
   delegate: 'GPU',
 };
 

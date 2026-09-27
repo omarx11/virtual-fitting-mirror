@@ -66,14 +66,6 @@ export type AiJobStatus =
   | 'expired'
   | 'abandoned';
 
-export const AI_TERMINAL_STATUSES: readonly AiJobStatus[] = [
-  'completed',
-  'failed',
-  'uncertain',
-  'expired',
-  'abandoned',
-];
-
 /** Sanitized, shopper-safe error codes. Provider messages are never forwarded verbatim. */
 export type AiErrorCode =
   | 'not-configured'

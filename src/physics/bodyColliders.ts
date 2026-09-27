@@ -18,10 +18,6 @@ export interface Capsule {
   radius: number;
 }
 
-export function colliderCount(): number {
-  return 4;
-}
-
 const Y = new Vector3(0, 1, 0);
 
 /** Writes the current capsules into `out` (reused every frame). */

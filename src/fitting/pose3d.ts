@@ -26,11 +26,6 @@ export function worldToBody(w: WorldLandmark, out = new Vector3()): Vector3 {
   return out.set(w.x, -w.y, -w.z);
 }
 
-/** Source-pixel point → scene (Y up) coordinates. */
-export function sourceToScene(x: number, y: number, out = new Vector3()): Vector3 {
-  return out.set(x, -y, 0);
-}
-
 export interface BodyFrame {
   /** Rotation from the rest frame (x left-shoulder side, y up, z front) to this frame. */
   quaternion: Quaternion;
