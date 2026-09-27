@@ -1,5 +1,7 @@
 # Virtual Fitting Mirror (prototype)
 
+A graduation project at **Qassim University**, designed and built by **Lamya**.
+
 A free, local, browser-based "mirror": pick a shirt and see it on a person in a video or a webcam
 feed. Pose tracking uses Google's MediaPipe Pose Landmarker. The default shirt is a **rigged 3D
 model** (Three.js): its torso and sleeves deform together through its skeleton, driven live by the
@@ -39,7 +41,8 @@ npm run dev               # web app on http://localhost:5173 + local API server 
 
 Then open `http://localhost:5173` in Chrome. `npm run dev` starts two processes: Vite (the web app,
 which forwards `/api` to the backend) and the small Node backend in `server/`. 2D and 3D work even
-if the backend is not running; `npm run dev:web` starts only Vite.
+if the backend is not running; `npm run dev:web` starts only Vite (its `/api` then answers "AI server
+not running" instead of proxy errors, so the browser console stays clean).
 
 If port 5173 is already in use, Vite picks another port; use the address it prints, and add that
 origin to `AI_ALLOWED_ORIGINS` in `.env` (e.g. `http://localhost:5180`) so the backend accepts its
@@ -152,7 +155,14 @@ Status messages on the video: **Tracking**, **Upper-body view** (hips out of fra
 **Tracking lost**, or a tracking error with **Retry**.
 
 Keyboard: `Space` play/pause · `[` `]` previous/next shirt · `G` shirt on/off · `M` mirror ·
-`F` fullscreen · `D` diagnostics. All controls are reachable with `Tab`.
+`F` fullscreen · `S` fold/unfold the sidebar · `D` diagnostics · `?` list of shortcuts · `Esc`
+closes a dialog. All controls are reachable with `Tab`.
+
+**Sidebar:** fold it (`S` or the panel button) to an icon rail with the mode switch, mirror and
+fullscreen; each section (Source, Shirts, Fit, View) also folds on its own. The layout is remembered.
+On phones and portrait tablets the controls become a bottom sheet: swipe its grip down to give the
+mirror the whole screen, up to bring the controls back. Animations follow the system
+"reduce motion" setting.
 
 **Best results:** a single person facing the camera, with the head and both shoulders visible,
 even lighting, roughly 1–3 m away. Chest-up framing is supported. The 3D shirt follows modest turns
@@ -179,6 +189,7 @@ even lighting, roughly 1–3 m away. Chest-up framing is supported. The 3D shirt
 | `npm run check` | typecheck + lint + unit and server tests + build (never calls a paid API) |
 | `npm run setup:assets` | Download/verify the models (`-- --check` to only verify) |
 | `npm run generate:garments` | Regenerate the demo shirt SVGs |
+| `npm run generate:brand` | Rebuild the web-sized Qassim University logo images from `assets/brand/` |
 | `npm run fetch:footage` | Download the openly licensed test clips (not committed) + derive crops with ffmpeg |
 
 First-time Playwright setup, only if Chromium isn't installed yet: `npx playwright install chromium`.
@@ -229,7 +240,8 @@ send the header `Content-Security-Policy: connect-src 'self' ws: wss: blob: data
 ```text
 src/app/          engine (non-React core), hooks, low-rate state, preferences (2D/3D/AI mode)
 src/ai/           AI mode: API contract types, same-origin client, capture helpers, state machine, hook
-src/components/   controls, catalogue, status, diagnostics
+src/components/   controls, catalogue, status, diagnostics, dialogs; ui/ (modal, cards, toasts)
+src/assets/brand/ web-sized university logo + mark (generated from assets/brand/)
 src/media/        file/camera sources, frame loop (requestVideoFrameCallback)
 src/tracking/     worker protocol, MediaPipe engine, backends, scheduler
 src/fitting/      landmark trust, tracking state machine, smoothing, 2D fit; 3D: pose3d (frames,
@@ -247,8 +259,10 @@ src/config/       documented thresholds, quality presets, 3D render settings
 public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLB (third-party);
                   ai/<id>/ demo product photos for AI mode (assets/garments/ai/SOURCE.md)
 assets/garments/  authoring sources (FBX), SOURCE.md — never shipped by Vite
+assets/brand/     original Qassim University logo (source for npm run generate:brand)
 public/models/    pose models (downloaded, not committed)
-scripts/          setup-assets.mjs, generate-garments.mjs, inspect-garment.mjs, generate-3d-thumbnail.mjs
+scripts/          setup-assets.mjs, generate-garments.mjs, inspect-garment.mjs, generate-3d-thumbnail.mjs,
+                  generate-brand-assets.mjs
 tests/unit, tests/server, tests/e2e, tests/fixtures
 docs/             RESEARCH, IMPLEMENTATION_PLAN, TESTING, LIMITATIONS, AI_TRYON_RESEARCH
 spike.html        standalone worker/delegate timing check (dev server: /spike.html)

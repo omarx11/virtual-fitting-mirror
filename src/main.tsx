@@ -2,6 +2,8 @@ import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { installLocalOnlyFetch } from './tracking/networkGuard';
+// Self-hosted (bundled) so the page still makes no third-party requests.
+import '@fontsource-variable/plus-jakarta-sans';
 import './styles.css';
 
 // Covers the main-thread tracking fallback and garment/physics loading; the worker installs its own.

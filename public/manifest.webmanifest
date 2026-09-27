@@ -1,0 +1,10 @@
+{
+  "name": "Virtual Fitting Mirror",
+  "short_name": "Fitting Mirror",
+  "description": "Live 2D/3D virtual try-on and an optional AI photo preview. A Qassim University graduation project by Lamya.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#0b0918",
+  "theme_color": "#0b0918",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

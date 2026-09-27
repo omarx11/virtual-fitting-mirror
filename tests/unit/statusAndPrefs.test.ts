@@ -64,6 +64,18 @@ describe('parsePreferences', () => {
     expect(p.fit.scale).toBe(1.3);
     expect(p.fitMode).toBe('cover');
   });
+  it('keeps the sidebar layout, dropping unknown or repeated section IDs', () => {
+    expect(DEFAULT_PREFERENCES.sidebarCollapsed).toBe(false);
+    const p = parsePreferences({
+      sidebarCollapsed: true,
+      collapsedSections: ['fit', 'fit', 'nope', 42, 'view'],
+    });
+    expect(p.sidebarCollapsed).toBe(true);
+    expect(p.collapsedSections).toEqual(['fit', 'view']);
+    expect(parsePreferences({ sidebarCollapsed: 'yes', collapsedSections: 'fit' })).toEqual(
+      DEFAULT_PREFERENCES,
+    );
+  });
 });
 
 describe('selectSubject', () => {

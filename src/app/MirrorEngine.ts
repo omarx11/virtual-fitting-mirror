@@ -178,7 +178,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   delegate: 'GPU',
 };
 
-const BACKGROUND = '#0d0f12';
+/** Letterbox colour around the video; matches --bg in styles.css. */
+const BACKGROUND = '#0b0918';
 
 /**
  * WebGL backing-store size for the garment layer: source aspect ratio, never more pixels than the

@@ -1,7 +1,40 @@
+import { Check } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import type { Garment3DStatus } from '../app/MirrorEngine';
 import { findCard, findMaterial, GARMENT_CARDS } from '../garments/catalogue';
 import type { Garment2DDefinition, GarmentDefinition } from '../garments/types';
+
+/** The accent ring on the selected card; it glides between cards when the selection changes. */
+export function SelectedRing({ layoutId }: { layoutId: string }) {
+  return (
+    <motion.span
+      className="garment-ring"
+      layoutId={layoutId}
+      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      aria-hidden
+    >
+      <span className="garment-check">
+        <Check size={12} strokeWidth={3} />
+      </span>
+    </motion.span>
+  );
+}
+
+function SwatchChip({ color, checked }: { color: string; checked: boolean }) {
+  return (
+    <span className="swatch-chip" style={{ background: color }} aria-hidden>
+      {checked && (
+        <motion.span
+          className="swatch-dot"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 24 }}
+        />
+      )}
+    </span>
+  );
+}
 
 export function GarmentPicker({
   kind,
@@ -39,7 +72,7 @@ export function GarmentPicker({
       : [];
   return (
     <fieldset className="garments">
-      <legend className="section-title">Shirts</legend>
+      <legend className="visually-hidden">Shirts</legend>
       <div className="garment-grid">
         {GARMENT_CARDS.filter((card) => card.kind === kind).map((card) => {
           const active = card.id === selectedCard.id;
@@ -47,7 +80,7 @@ export function GarmentPicker({
           const shown = garments.find((g) => g.id === shownId);
           if (!shown) return null;
           return (
-            <button
+            <motion.button
               key={card.id}
               type="button"
               className="garment"
@@ -56,18 +89,21 @@ export function GarmentPicker({
                 if (!active) onSelect(shown.id);
               }}
               title={card.description}
+              whileTap={{ scale: 0.95 }}
             >
-              <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
-              <span>{card.name}</span>
-            </button>
+              {active && <SelectedRing layoutId="garment-ring" />}
+              <span className="garment-thumb">
+                <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
+              </span>
+              <span className="garment-name">{card.name}</span>
+            </motion.button>
           );
         })}
       </div>
       {selected?.kind === '3d' && (
         <div className="swatches" role="radiogroup" aria-label="Fabric colour">
           {selected.materials.map((m) => (
-            // biome-ignore lint/a11y/useSemanticElements: a styled swatch button with radio semantics.
-            <button
+            <motion.button
               key={m.id}
               type="button"
               role="radio"
@@ -75,18 +111,18 @@ export function GarmentPicker({
               className="swatch"
               title={m.label}
               onClick={() => onMaterial(m.id)}
+              whileTap={{ scale: 0.94 }}
             >
-              <span className="swatch-chip" style={{ background: m.color }} aria-hidden />
+              <SwatchChip color={m.color} checked={m.id === material?.id} />
               <span>{m.label}</span>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}
       {flatVariants.length > 1 && (
         <div className="swatches" role="radiogroup" aria-label="Shirt colour">
           {flatVariants.map((g) => (
-            // biome-ignore lint/a11y/useSemanticElements: a styled swatch button with radio semantics.
-            <button
+            <motion.button
               key={g.id}
               type="button"
               role="radio"
@@ -94,10 +130,11 @@ export function GarmentPicker({
               className="swatch"
               title={`${g.name} — ${g.description}`}
               onClick={() => onSelect(g.id)}
+              whileTap={{ scale: 0.94 }}
             >
-              <span className="swatch-chip" style={{ background: g.swatch.color }} aria-hidden />
+              <SwatchChip color={g.swatch.color} checked={g.id === selectedId} />
               <span>{g.swatch.label}</span>
-            </button>
+            </motion.button>
           ))}
         </div>
       )}

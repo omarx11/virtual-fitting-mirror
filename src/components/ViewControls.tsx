@@ -1,4 +1,5 @@
 import { Expand, FlipHorizontal2, Hand, Minimize, Shirt, Wind } from 'lucide-react';
+import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 
 function Toggle({
@@ -15,16 +16,25 @@ function Toggle({
   shortcut?: string;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       className="toggle"
       aria-pressed={pressed}
       onClick={onToggle}
       title={shortcut ? `${label} (${shortcut})` : label}
+      whileTap={{ scale: 0.96 }}
     >
-      {icon}
-      <span>{label}</span>
-    </button>
+      <span className="toggle-icon">{icon}</span>
+      <span className="toggle-label">{label}</span>
+      <span className="switch" aria-hidden>
+        <motion.span
+          className="switch-knob"
+          initial={false}
+          animate={{ x: pressed ? 12 : 0 }}
+          transition={{ type: 'spring', stiffness: 600, damping: 32 }}
+        />
+      </span>
+    </motion.button>
   );
 }
 
@@ -61,7 +71,7 @@ export function ViewControls({
 }) {
   return (
     <fieldset className="view-controls">
-      <legend className="section-title">View</legend>
+      <legend className="visually-hidden">View</legend>
       <div className="toggle-grid">
         {garmentToggles && (
           <Toggle

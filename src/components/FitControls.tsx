@@ -19,7 +19,7 @@ export function FitControls({
     fit.scale === DEFAULT_USER_FIT.scale && fit.verticalOffset === DEFAULT_USER_FIT.verticalOffset;
   return (
     <fieldset className="fit">
-      <legend className="section-title">Adjust fit</legend>
+      <legend className="visually-hidden">Adjust fit</legend>
       <div className="slider-row">
         <label htmlFor={scaleId}>Size</label>
         <input

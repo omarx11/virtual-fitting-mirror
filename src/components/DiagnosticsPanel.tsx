@@ -1,3 +1,4 @@
+import { Activity, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { fetchAiUsage } from '../ai/client';
 import type { AiViewState } from '../ai/controller';
@@ -58,7 +59,13 @@ export function DiagnosticsPanel({
       open={open}
       onToggle={(e) => onToggleOpen((e.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary className="section-title">Diagnostics</summary>
+      <summary className="card-title diag-summary">
+        <span className="section-icon" aria-hidden>
+          <Activity size={17} />
+        </span>
+        <span className="section-name">Diagnostics</span>
+        <ChevronDown aria-hidden size={18} className="card-chevron" />
+      </summary>
       <div className="diag-controls">
         <label className="check">
           <input type="checkbox" checked={showLandmarks} onChange={onToggleLandmarks} /> Show landmarks
@@ -383,7 +390,8 @@ function AiDiagnostics({
           </select>
         </label>
       )}
-      <AiUsage />
+      {/* Usage lives on the local AI server: nothing to ask while it is not running. */}
+      {!ai.unavailable?.backendDown && <AiUsage />}
     </>
   );
 }

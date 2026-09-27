@@ -49,6 +49,8 @@ export interface AiClient {
 }
 
 const BASE = '/api/ai';
+/** Set by the Vite dev/preview server when the local AI server is not running (vite.config.ts). */
+const BACKEND_OFFLINE_HEADER = 'x-ai-backend-offline';
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   let res: Response;
@@ -62,6 +64,9 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new AiApiError('network', 0, 'The AI service on this device could not be reached.');
+  }
+  if (res.headers.get(BACKEND_OFFLINE_HEADER)) {
+    throw new AiApiError('network', 503, 'The AI service on this device is not running.');
   }
   if (res.ok) return res;
   let code: AiErrorCode | 'network' = res.status === 404 ? 'not-found' : 'internal';

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import react from '@vitejs/plugin-react';
-import { loadEnv } from 'vite';
+import { type Connect, loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const tasksVisionVersion: string = JSON.parse(
@@ -17,6 +18,62 @@ const tasksVisionVersion: string = JSON.parse(
 export const CONNECT_SRC = "connect-src 'self' ws: wss: blob: data:";
 const securityHeaders: Record<string, string> = { 'Content-Security-Policy': CONNECT_SRC };
 
+/** Header meaning "the local AI server is not running"; src/ai/client.ts checks for it. */
+const BACKEND_OFFLINE_HEADER = 'x-ai-backend-offline';
+
+/**
+ * With only the web app running (e.g. `npm run dev:web`), proxying /api would fail with 502s that
+ * the browser logs as console errors on every AI check. This answers /api requests itself while
+ * the backend port is closed: 204 plus BACKEND_OFFLINE_HEADER, which the client reports as "the
+ * AI server is not running". Registered before Vite's proxy; the port is re-probed every 2 s.
+ */
+function apiOfflineFallback(target: string): Plugin {
+  const { hostname, port, protocol } = new URL(target);
+  const probe = () =>
+    new Promise<boolean>((resolve) => {
+      const socket = connect({ host: hostname, port: Number(port) || (protocol === 'https:' ? 443 : 80) });
+      const done = (ok: boolean) => {
+        socket.destroy();
+        resolve(ok);
+      };
+      socket.setTimeout(500, () => done(false));
+      socket.once('connect', () => done(true));
+      socket.once('error', () => done(false));
+    });
+  let checkedAt = 0;
+  let online = false;
+  let pending: Promise<boolean> | null = null;
+  const isOnline = (): Promise<boolean> => {
+    if (Date.now() - checkedAt < 2000) return Promise.resolve(online);
+    pending ??= probe().then((ok) => {
+      online = ok;
+      checkedAt = Date.now();
+      pending = null;
+      return ok;
+    });
+    return pending;
+  };
+  const middleware: Connect.NextHandleFunction = (req, res, next) => {
+    if (!req.url?.startsWith('/api/')) return next();
+    void isOnline().then((ok) => {
+      if (ok) return next();
+      res.statusCode = 204;
+      res.setHeader(BACKEND_OFFLINE_HEADER, '1');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end();
+    });
+  };
+  return {
+    name: 'api-offline-fallback',
+    configureServer: (server) => {
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer: (server) => {
+      server.middlewares.use(middleware);
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Only AI_PORT / AI_API_TARGET are read here (for the proxy). Secrets are never loaded into the
   // frontend: only VITE_-prefixed variables reach browser code, and none are used.
@@ -26,7 +83,7 @@ export default defineConfig(({ mode }) => {
   // header is kept (changeOrigin: false) so the backend's origin checks see the real page origin.
   const proxy = { '/api': { target: apiTarget, changeOrigin: false } };
   return {
-    plugins: [react()],
+    plugins: [react(), apiOfflineFallback(apiTarget)],
     server: { headers: securityHeaders, proxy },
     preview: { headers: securityHeaders, proxy },
     define: {

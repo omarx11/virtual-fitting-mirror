@@ -26,7 +26,15 @@ export interface UiPreferences {
   lastGarment2d: string;
   lastGarment3d: string;
   aiGarmentId: string;
+  /** Sidebar folded to an icon rail (desktop) or a compact bar (phones / portrait tablets). */
+  sidebarCollapsed: boolean;
+  /** IDs of the sidebar sections the user folded away. */
+  collapsedSections: string[];
 }
+
+/** Sidebar sections that can be folded. */
+export const PANEL_SECTION_IDS = ['source', 'garments', 'fit', 'view'] as const;
+export type PanelSectionId = (typeof PANEL_SECTION_IDS)[number];
 
 export interface Preferences extends EngineSettings, UiPreferences {}
 
@@ -36,6 +44,8 @@ export const UI_PREFERENCE_KEYS: readonly (keyof UiPreferences)[] = [
   'lastGarment2d',
   'lastGarment3d',
   'aiGarmentId',
+  'sidebarCollapsed',
+  'collapsedSections',
 ];
 
 const firstOfKind = (kind: LiveMode) =>
@@ -48,6 +58,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   lastGarment2d: firstOfKind('2d'),
   lastGarment3d: firstOfKind('3d'),
   aiGarmentId: DEFAULT_AI_GARMENT_ID,
+  sidebarCollapsed: false,
+  collapsedSections: [],
 };
 
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
@@ -56,7 +68,11 @@ const isGarmentOfKind = (v: unknown, kind: LiveMode): v is string =>
 
 /** Validates untrusted stored data field by field. Unknown or invalid fields use defaults. */
 export function parsePreferences(raw: unknown): Preferences {
-  const p: Preferences = { ...DEFAULT_PREFERENCES, fit: { ...DEFAULT_PREFERENCES.fit } };
+  const p: Preferences = {
+    ...DEFAULT_PREFERENCES,
+    fit: { ...DEFAULT_PREFERENCES.fit },
+    collapsedSections: [...DEFAULT_PREFERENCES.collapsedSections],
+  };
   if (!raw || typeof raw !== 'object') return p;
   const r = raw as Record<string, unknown>;
   if (typeof r.garmentId === 'string' && GARMENTS.some((g) => g.id === r.garmentId))
@@ -68,6 +84,11 @@ export function parsePreferences(raw: unknown): Preferences {
   if (isBool(r.showLandmarks)) p.showLandmarks = r.showLandmarks;
   if (isBool(r.occlusion)) p.occlusion = r.occlusion;
   if (isBool(r.diagnosticsOpen)) p.diagnosticsOpen = r.diagnosticsOpen;
+  if (isBool(r.sidebarCollapsed)) p.sidebarCollapsed = r.sidebarCollapsed;
+  if (Array.isArray(r.collapsedSections)) {
+    const ids: readonly unknown[] = PANEL_SECTION_IDS;
+    p.collapsedSections = [...new Set(r.collapsedSections.filter((id) => ids.includes(id)))] as string[];
+  }
   if (r.fitMode === 'contain' || r.fitMode === 'cover') p.fitMode = r.fitMode;
   if (typeof r.preset === 'string' && r.preset in QUALITY_PRESETS)
     p.preset = r.preset as Preferences['preset'];

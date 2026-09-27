@@ -1,8 +1,10 @@
 import { ImageUp, LogOut, TriangleAlert } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useRef, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
 import type { AiGarmentCategory, AiGarmentPhotoType } from '../ai/types';
 import { AI_GARMENTS, findAiGarment } from '../garments/aiCatalogue';
+import { SelectedRing } from './GarmentPicker';
 
 /**
  * Side-panel controls for AI mode: garment choice (product photos), operator setup when AI is
@@ -33,8 +35,7 @@ export function AiTryOnPanel({
 
   return (
     <div className="ai-panel">
-      <h2 className="section-title">AI photo preview</h2>
-      <p className="hint">
+      <p className="hint lead">
         Take a photo, choose a garment and generate one still image. This is not live, and not a size or fit
         guide: colours, logos and details may differ from the real product.
       </p>
@@ -66,11 +67,10 @@ export function AiTryOnPanel({
       )}
 
       <fieldset className="garments" disabled={generating}>
-        <legend className="section-title">Garment photo</legend>
+        <legend className="field-label">Garment photo</legend>
         <div className="garment-grid" role="radiogroup" aria-label="AI garment">
           {AI_GARMENTS.map((g) => (
-            // biome-ignore lint/a11y/useSemanticElements: a thumbnail card with radio semantics.
-            <button
+            <motion.button
               key={g.id}
               type="button"
               role="radio"
@@ -78,11 +78,17 @@ export function AiTryOnPanel({
               className="garment"
               title={`${g.label} — ${g.description}`}
               onClick={() => onSelectGarment(g.id)}
+              whileTap={{ scale: 0.95 }}
             >
-              <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
-              <span>{g.label}</span>
+              {choice?.kind === 'catalogue' && choice.id === g.id && (
+                <SelectedRing layoutId="ai-garment-ring" />
+              )}
+              <span className="garment-thumb photo">
+                <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
+              </span>
+              <span className="garment-name">{g.label}</span>
               {g.demo && <span className="badge badge-flat">Demo</span>}
-            </button>
+            </motion.button>
           ))}
         </div>
         {selected && <p className="hint">{selected.provenance}</p>}

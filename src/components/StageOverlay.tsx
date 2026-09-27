@@ -1,4 +1,14 @@
-import { CircleCheck, Info, LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react';
+import {
+  CircleCheck,
+  Info,
+  LoaderCircle,
+  RefreshCw,
+  ScanFace,
+  Shirt,
+  TriangleAlert,
+  Video,
+} from 'lucide-react';
+import { AnimatePresence, motion, type Variants } from 'motion/react';
 import type { EngineSnapshot } from '../app/MirrorEngine';
 import { describeStatus, type StatusMessage } from '../app/statusMessages';
 import { SourceControls } from './SourceControls';
@@ -8,6 +18,59 @@ function ToneIcon({ tone, loading }: { tone: StatusMessage['tone']; loading: boo
   if (tone === 'ok') return <CircleCheck aria-hidden size={18} />;
   if (tone === 'info') return <Info aria-hidden size={18} />;
   return <TriangleAlert aria-hidden size={18} />;
+}
+
+const STEPS = [
+  {
+    icon: <Video aria-hidden size={20} />,
+    tone: 'blue',
+    title: 'Pick a source',
+    text: 'Webcam or video',
+  },
+  {
+    icon: <ScanFace aria-hidden size={20} />,
+    tone: 'violet',
+    title: 'Face the camera',
+    text: 'Shoulders in view',
+  },
+  {
+    icon: <Shirt aria-hidden size={20} />,
+    tone: 'pink',
+    title: 'Try on shirts',
+    text: 'Switch styles live',
+  },
+] as const;
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
+const item: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 26 } },
+};
+
+/** Slowly drifting colour glows behind the welcome screen (static with reduced motion). */
+function Aurora() {
+  return (
+    <div className="aurora" aria-hidden>
+      <motion.span
+        className="blob blob-pink"
+        animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.span
+        className="blob blob-violet"
+        animate={{ x: [0, -50, 30, 0], y: [0, 30, -20, 0] }}
+        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.span
+        className="blob blob-teal"
+        animate={{ x: [0, 30, -40, 0], y: [0, 20, -30, 0] }}
+        transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </div>
+  );
 }
 
 export function StageOverlay({
@@ -26,42 +89,76 @@ export function StageOverlay({
   const noSource = snapshot.source.state === 'none' || snapshot.source.state === 'error';
   return (
     <>
-      {status && (
-        <div
-          className={`status-pill tone-${status.tone}`}
-          role="status"
-          aria-live="polite"
-          data-testid="status"
-        >
-          <ToneIcon tone={status.tone} loading={loading} />
-          <div>
-            <strong>{status.title}</strong>
-            {status.detail && <span className="status-detail">{status.detail}</span>}
-          </div>
-          {snapshot.tracker.state === 'error' && (
-            <button type="button" className="button small" onClick={onRetryTracker}>
-              <RefreshCw aria-hidden size={16} /> Retry
-            </button>
-          )}
-        </div>
-      )}
-      {noSource && (
-        <div className="empty-state">
-          <h1>Virtual fitting mirror</h1>
-          <p>
-            Choose a video of a person facing the camera, or use a webcam. Video is processed on this device
-            and is never uploaded; only the optional AI mode sends one captured photo, after you agree.
-          </p>
-          <SourceControls status={snapshot.source} onOpenFile={onOpenFile} onOpenCamera={onOpenCamera} />
-          {snapshot.tracker.state === 'error' && (
-            <p className="error-text">
-              Tracking could not start: {snapshot.tracker.message}{' '}
-              <button type="button" className="text-button" onClick={onRetryTracker}>
-                Retry
+      <AnimatePresence>
+        {status && (
+          <motion.div
+            key="status"
+            className={`status-pill tone-${status.tone}`}
+            role="status"
+            aria-live="polite"
+            data-testid="status"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          >
+            <ToneIcon tone={status.tone} loading={loading} />
+            <motion.div
+              key={status.title}
+              className="status-text"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <strong>{status.title}</strong>
+              {status.detail && <span className="status-detail">{status.detail}</span>}
+            </motion.div>
+            {snapshot.tracker.state === 'error' && (
+              <button type="button" className="button small" onClick={onRetryTracker}>
+                <RefreshCw aria-hidden size={16} /> Retry
               </button>
-            </p>
-          )}
-        </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* No exit animation: the welcome screen holds a file input and must leave immediately. */}
+      {noSource && (
+        <motion.div className="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Aurora />
+          <motion.div className="hero" variants={container} initial="hidden" animate="show">
+            <motion.h1 variants={item}>
+              Virtual <span className="gradient-text">fitting mirror</span>
+            </motion.h1>
+            <motion.p variants={item} className="hero-lead">
+              Try on shirts live in 2D or 3D, or create an AI photo preview.
+            </motion.p>
+            <motion.div variants={item} className="hero-actions">
+              <SourceControls status={snapshot.source} onOpenFile={onOpenFile} onOpenCamera={onOpenCamera} />
+            </motion.div>
+            {snapshot.tracker.state === 'error' && (
+              <motion.p variants={item} className="error-text">
+                Tracking could not start: {snapshot.tracker.message}{' '}
+                <button type="button" className="text-button" onClick={onRetryTracker}>
+                  Retry
+                </button>
+              </motion.p>
+            )}
+            <motion.ol variants={item} className="hero-steps">
+              {STEPS.map((s, i) => (
+                <li key={s.title} data-tone={s.tone}>
+                  <span className="step-icon" aria-hidden>
+                    <span className="section-icon">{s.icon}</span>
+                    <span className="step-number">{i + 1}</span>
+                  </span>
+                  <span className="step-text">
+                    <span className="step-title">{s.title}</span>
+                    <span className="step-detail">{s.text}</span>
+                  </span>
+                </li>
+              ))}
+            </motion.ol>
+          </motion.div>
+        </motion.div>
       )}
     </>
   );

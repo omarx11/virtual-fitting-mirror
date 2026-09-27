@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t">
+  <title id="t">Virtual Fitting Mirror</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6fa5"/>
+      <stop offset="0.5" stop-color="#a07cff"/>
+      <stop offset="1" stop-color="#2fd6c1"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <path d="M24 14 13 20l5 10 5-2v22h18V28l5 2 5-10-11-6c-1.6 3-4.6 5-8 5s-6.4-2-8-5Z" fill="#fff"/>
+  <path d="M48 8l1.6 3.4L53 13l-3.4 1.6L48 18l-1.6-3.4L43 13l3.4-1.6Z" fill="#fff"/>
+</svg>

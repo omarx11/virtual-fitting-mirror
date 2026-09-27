@@ -8,6 +8,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
 import { AI_PROVIDER_RETENTION_URL } from '../ai/types';
@@ -29,9 +30,24 @@ function Elapsed({ startedAt, now }: { startedAt: number; now: () => number }) {
 
 function Still({ src, mirror, alt, testId }: { src: string; mirror: boolean; alt: string; testId: string }) {
   return (
-    <img className={mirror ? 'ai-still mirrored' : 'ai-still'} src={src} alt={alt} data-testid={testId} />
+    <motion.img
+      className={mirror ? 'ai-still mirrored' : 'ai-still'}
+      src={src}
+      alt={alt}
+      data-testid={testId}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    />
   );
 }
+
+/** Entrance for the floating action bar at the bottom of the stage. */
+const barMotion = {
+  initial: { opacity: 0, y: 24 },
+  animate: { opacity: 1, y: 0 },
+  transition: { type: 'spring', stiffness: 320, damping: 30 },
+} as const;
 
 function ConsentDialog({
   testProvider,
@@ -43,7 +59,19 @@ function ConsentDialog({
   onDecline: () => void;
 }) {
   return (
-    <div className="ai-consent" role="dialog" aria-modal="true" aria-labelledby="ai-consent-title">
+    <motion.div
+      className="ai-consent"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-consent-title"
+      initial={{ opacity: 0, y: 20, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.15 } }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+    >
+      <span className="ai-consent-icon" aria-hidden>
+        <Sparkles size={22} />
+      </span>
       <h2 id="ai-consent-title">Send your photo for an AI preview?</h2>
       {testProvider && (
         <p className="ai-test-note">
@@ -80,7 +108,7 @@ function ConsentDialog({
           Agree &amp; generate
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -122,7 +150,7 @@ export function AiResultView({
   if (!capture) {
     // Live preview: plain video underneath, no garment drawn.
     return (
-      <div className="ai-bar" data-testid="ai-live-bar">
+      <motion.div className="ai-bar" data-testid="ai-live-bar" {...barMotion}>
         {phase === 'checking' && <p className="hint">Checking the AI service…</p>}
         {phase === 'unconfigured' && (
           <p className="ai-bar-text">
@@ -141,18 +169,32 @@ export function AiResultView({
                 {error.message}
               </p>
             )}
-            <button type="button" className="button primary large" onClick={onCapture} disabled={!canCapture}>
+            <button
+              type="button"
+              className="button primary large shutter"
+              onClick={onCapture}
+              disabled={!canCapture}
+            >
               <Camera aria-hidden size={20} /> Capture photo
             </button>
           </>
         )}
-      </div>
+      </motion.div>
     );
   }
 
   const showResult = phase === 'result' && result;
   return (
     <div className="ai-stage" data-testid="ai-stage">
+      {/* A soft camera flash each time a new photo is taken. */}
+      <motion.div
+        key={capture.url}
+        className="ai-flash"
+        aria-hidden
+        initial={{ opacity: 0.85 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+      />
       <div className={`ai-frame${showResult && compare === 'split' ? ' split' : ''}`}>
         {showResult ? (
           <>
@@ -199,21 +241,25 @@ export function AiResultView({
         )}
       </div>
 
-      {phase === 'consent' && (
-        <ConsentDialog
-          testProvider={state.capabilities?.testProvider ?? false}
-          onAccept={() => controller.acceptConsent()}
-          onDecline={() => controller.declineConsent()}
-        />
-      )}
+      <AnimatePresence>
+        {phase === 'consent' && (
+          <ConsentDialog
+            key="consent"
+            testProvider={state.capabilities?.testProvider ?? false}
+            onAccept={() => controller.acceptConsent()}
+            onDecline={() => controller.declineConsent()}
+          />
+        )}
+      </AnimatePresence>
 
-      <div className="ai-bar">
+      <motion.div className="ai-bar" {...barMotion}>
         {active && job && (
           <p className="ai-progress" role="status" aria-live="polite" data-testid="ai-progress">
             <LoaderCircle aria-hidden size={18} className="spin" /> {STAGE_LABELS[phase]}{' '}
             <Elapsed startedAt={job.startedAt} now={now} />
           </p>
         )}
+        {active && <span className="progress-track" aria-hidden />}
         {state.notice && <p className="hint">{state.notice}</p>}
         {phase === 'error' && error && (
           <p className="error-text" role="alert" data-testid="ai-error">
@@ -232,8 +278,18 @@ export function AiResultView({
                   aria-checked={compare === v}
                   onClick={() => setCompare(v)}
                 >
-                  {v === 'split' ? <Columns2 aria-hidden size={16} /> : null}
-                  {v === 'before' ? 'Before' : v === 'after' ? 'After' : 'Side by side'}
+                  {compare === v && (
+                    <motion.span
+                      className="segment-pill"
+                      layoutId="compare-pill"
+                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="segment-content">
+                    {v === 'split' ? <Columns2 aria-hidden size={16} /> : null}
+                    {v === 'before' ? 'Before' : v === 'after' ? 'After' : 'Side by side'}
+                  </span>
                 </button>
               ))}
             </div>
@@ -275,7 +331,7 @@ export function AiResultView({
           </p>
         )}
         {!showResult && !active && !garmentLabel && <p className="hint">Choose a garment in the panel.</p>}
-      </div>
+      </motion.div>
     </div>
   );
 }
