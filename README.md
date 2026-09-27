@@ -20,7 +20,8 @@ A **2D / 3D / AI** selector picks the mode:
 
 Every mode is an approximate **visual preview**, not body measurement or a sizing tool: your own
 clothes can show at the edges in 2D/3D, and AI images can alter details — see
-[docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+[docs/LIMITATIONS.md](docs/LIMITATIONS.md). A short visual summary of the research, testing and
+limitations is in the app at **/research** (About → *Research, testing & limits*).
 
 ## Requirements
 
@@ -253,6 +254,7 @@ src/garments/     catalogue (2D | 3D union), image preloading, modelLoader (GLB 
                   rigModel, rigs/*.ts (per-asset rig, calibration and simulation config)
 src/physics/      cloth mode: proxy builder, Jolt world, body colliders, ClothSimulation (lazy-loaded)
 src/inspect/      development-only 3D inspection view (/?inspect=3d)
+src/research/     visual research / testing / limitations summary page (/research, also linked from About)
 server/           Node backend (Fastify): config, AI routes, sessions, jobs, daily credit ledger,
                   image validation (Sharp), providers (FASHN SDK adapter, offline fake)
 src/config/       documented thresholds, quality presets, 3D render settings

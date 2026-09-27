@@ -181,3 +181,33 @@ test.describe('camera', () => {
     await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
   });
 });
+
+test.describe('research page', () => {
+  test('loads on its own, shows every screenshot, and links back to the mirror', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/research');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Behind the mirror');
+    // The mirror (and its tracker worker) is not started on this page.
+    expect(page.workers()).toHaveLength(0);
+    const images = page.locator('.rs-gallery img');
+    await expect(images).toHaveCount(4);
+    for (const img of await images.all()) {
+      await img.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth))
+        .toBeGreaterThan(0);
+    }
+    await page.getByRole('link', { name: 'Back to the mirror' }).click();
+    await page.waitForFunction(() => '__mirror' in window);
+    expect(errors).toEqual([]);
+  });
+
+  test('is linked from the About dialog', async ({ page }) => {
+    await openApp(page);
+    await page
+      .getByRole('button', { name: /About this project/ })
+      .first()
+      .click();
+    await expect(page.getByRole('link', { name: /Research, testing/ })).toHaveAttribute('href', '/research');
+  });
+});

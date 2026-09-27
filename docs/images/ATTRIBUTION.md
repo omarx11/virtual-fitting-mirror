@@ -17,4 +17,8 @@ under the same licences:
   https://commons.wikimedia.org/wiki/File:Squat_-_exercise_demonstration_video.webm — CC BY 3.0
   (https://creativecommons.org/licenses/by/3.0/). Changes: landmarks and UI added.
 
+WebP copies of `3d-upper-body-arms`, `3d-kiosk-mirrored-overlay`, `3d-inspection-poses` and
+`back-view-hidden` (re-encoded, same content and licences) are in `src/assets/research/` and are shown,
+with these credits, on the in-app research page (`/research`).
+
 The shirt artwork itself is original and CC0 (see public/garments/LICENSE.md).

@@ -1829,6 +1829,12 @@ kbd {
   list-style: none;
 }
 
+.about-research {
+  width: 100%;
+  margin-top: 14px;
+  text-decoration: none;
+}
+
 .tag {
   padding: 4px 10px;
   border-radius: 999px;

@@ -1,4 +1,4 @@
-import { Box, GraduationCap, Info, ShieldCheck, Shirt, Sparkles } from 'lucide-react';
+import { Box, FlaskConical, GraduationCap, Info, ShieldCheck, Shirt, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BRAND } from '../app/brand';
 import { Modal } from './ui/Modal';
@@ -76,6 +76,9 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
           </li>
         ))}
       </ul>
+      <a className="button about-research" href="/research">
+        <FlaskConical aria-hidden size={18} /> Research, testing &amp; limits
+      </a>
     </Modal>
   );
 }

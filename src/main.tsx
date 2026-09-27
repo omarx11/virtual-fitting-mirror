@@ -18,11 +18,17 @@ const InspectView = inspect
   ? lazy(() => import('./inspect/InspectView').then((m) => ({ default: m.InspectView })))
   : null;
 
+// Research & testing notes (/research); loaded on its own so the mirror never downloads it.
+const ResearchPage = /^\/research\/?$/.test(location.pathname)
+  ? lazy(() => import('./research/ResearchPage').then((m) => ({ default: m.ResearchPage })))
+  : null;
+const Page = InspectView ?? ResearchPage;
+
 createRoot(root).render(
   <StrictMode>
-    {InspectView ? (
+    {Page ? (
       <Suspense fallback={null}>
-        <InspectView />
+        <Page />
       </Suspense>
     ) : (
       <App />
