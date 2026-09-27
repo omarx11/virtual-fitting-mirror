@@ -48,25 +48,38 @@ export async function captureVideoFrame(
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+export type PhotoErrorKind = 'type' | 'size' | 'read' | 'convert';
+
+/** A developer photo that cannot be used; `kind` picks the translated message. */
+export class PhotoError extends Error {
+  constructor(
+    readonly kind: PhotoErrorKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PhotoError';
+  }
+}
+
 /**
  * Loads a user-supplied still photo (developer testing). EXIF orientation is applied by the
  * browser (`imageOrientation: 'from-image'`); re-encoding drops all metadata.
  */
 export async function loadPhotoFile(file: File, maxBytes: number): Promise<CapturedImage> {
-  if (!PHOTO_TYPES.includes(file.type)) throw new Error('Choose a JPEG, PNG or WebP photo.');
-  if (file.size > maxBytes) throw new Error('That photo is too large.');
+  if (!PHOTO_TYPES.includes(file.type)) throw new PhotoError('type', 'Choose a JPEG, PNG or WebP photo.');
+  if (file.size > maxBytes) throw new PhotoError('size', 'That photo is too large.');
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
-    throw new Error('That photo could not be read.');
+    throw new PhotoError('read', 'That photo could not be read.');
   }
   try {
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) throw new Error('Canvas is unavailable.');
+    if (!ctx) throw new PhotoError('convert', 'Canvas is unavailable.');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(bitmap, 0, 0);
@@ -74,7 +87,7 @@ export async function loadPhotoFile(file: File, maxBytes: number): Promise<Captu
     const { width, height } = canvas;
     canvas.width = 0;
     canvas.height = 0;
-    if (!blob) throw new Error('That photo could not be converted.');
+    if (!blob) throw new PhotoError('convert', 'That photo could not be converted.');
     return { blob, width, height, source: 'photo', mediaTimeMs: null };
   } finally {
     bitmap.close();

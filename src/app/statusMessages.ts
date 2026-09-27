@@ -3,9 +3,10 @@
  * failure is never reported as a posture problem, and vice versa.
  */
 import type { TrackingPhase } from '../fitting/interpreter';
+import { en, type Messages, type StatusTone } from '../i18n/en';
 import type { SourceStatus, TrackerStatus } from './MirrorEngine';
 
-export type StatusTone = 'ok' | 'info' | 'warn' | 'error';
+export type { StatusTone };
 
 export interface StatusMessage {
   tone: StatusTone;
@@ -13,52 +14,35 @@ export interface StatusMessage {
   detail?: string;
 }
 
-export const PHASE_MESSAGES: Record<TrackingPhase, StatusMessage> = {
-  full: { tone: 'ok', title: 'Tracking' },
-  upper: { tone: 'ok', title: 'Upper-body view' },
-  holding: { tone: 'ok', title: 'Tracking' },
-  'too-close': {
-    tone: 'warn',
-    title: 'Move back slightly',
-    detail: 'Keep your head and both shoulders in view.',
+export function describeStatus(
+  input: {
+    tracker: TrackerStatus;
+    source: SourceStatus;
+    phase: TrackingPhase;
   },
-  turned: {
-    tone: 'warn',
-    title: 'Face the mirror',
-    detail: 'Stand upright facing the camera — side and back views are not supported.',
-  },
-  searching: {
-    tone: 'info',
-    title: 'Step into view',
-    detail: 'Face the camera with your head and both shoulders visible.',
-  },
-  lost: { tone: 'warn', title: 'Tracking lost', detail: 'Step back into view, facing the camera.' },
-};
-
-export function describeStatus(input: {
-  tracker: TrackerStatus;
-  source: SourceStatus;
-  phase: TrackingPhase;
-}): StatusMessage | null {
+  m: Messages['status'] = en.status,
+): StatusMessage | null {
   const { tracker, source, phase } = input;
   // Without a source the empty-state panel explains everything (including tracker errors).
   if (source.state === 'none' || source.state === 'error') return null;
   if (tracker.state === 'error') {
-    return { tone: 'error', title: 'Tracking unavailable', detail: tracker.message };
-  }
-  if (source.state === 'loading') {
-    return { tone: 'info', title: source.kind === 'camera' ? 'Starting camera…' : 'Opening video…' };
-  }
-  if (tracker.state === 'loading' || tracker.state === 'idle') {
-    const pct =
-      tracker.state === 'loading' && tracker.progress !== null
-        ? ` ${Math.round(tracker.progress * 100)}%`
-        : '';
     return {
-      tone: 'info',
-      title: `Loading tracking…${pct}`,
-      detail: tracker.state === 'loading' ? tracker.message : '',
+      tone: 'error',
+      title: m.trackingUnavailable,
+      detail: m.trackerError(tracker.kind, tracker.message),
     };
   }
-  return PHASE_MESSAGES[phase];
+  if (source.state === 'loading') {
+    return { tone: 'info', title: source.kind === 'camera' ? m.startingCamera : m.openingVideo };
+  }
+  if (tracker.state === 'loading' || tracker.state === 'idle') {
+    const percent =
+      tracker.state === 'loading' && tracker.progress !== null ? Math.round(tracker.progress * 100) : null;
+    return {
+      tone: 'info',
+      title: m.loadingTracking(percent),
+      detail: tracker.state === 'loading' ? m.loadingSteps[tracker.step] : '',
+    };
+  }
+  return m.phases[phase];
 }

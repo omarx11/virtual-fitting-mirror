@@ -1,7 +1,18 @@
-import { ChevronUp, Expand, FlipHorizontal2, Keyboard, Minimize, PanelRightOpen } from 'lucide-react';
+import {
+  ChevronUp,
+  Expand,
+  FlipHorizontal2,
+  Keyboard,
+  Minimize,
+  PanelLeftOpen,
+  PanelRightOpen,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { BRAND } from '../app/brand';
 import type { TryOnMode } from '../app/preferences';
+import { withKey } from '../i18n/format';
+import { useI18n } from '../i18n/I18nProvider';
+import { LanguageToggle } from './LanguageToggle';
 import { TryOnModeSelector } from './TryOnModeSelector';
 
 /**
@@ -31,6 +42,9 @@ export function SidebarRail({
   onShortcuts: () => void;
   onAbout: () => void;
 }) {
+  const { m, rtl } = useI18n();
+  const expandLabel = narrow ? m.app.showAllControls : m.app.unfoldSidebar;
+  const UnfoldIcon = rtl ? PanelLeftOpen : PanelRightOpen;
   return (
     <motion.div
       className="rail"
@@ -43,11 +57,11 @@ export function SidebarRail({
         type="button"
         className="icon-button accent"
         onClick={onExpand}
-        aria-label={narrow ? 'Show all controls' : 'Unfold sidebar'}
+        aria-label={expandLabel}
         aria-expanded={false}
-        title={narrow ? 'Show all controls (S)' : 'Unfold sidebar (S)'}
+        title={withKey(expandLabel, 'S')}
       >
-        {narrow ? <ChevronUp aria-hidden size={20} /> : <PanelRightOpen aria-hidden size={20} />}
+        {narrow ? <ChevronUp aria-hidden size={20} /> : <UnfoldIcon aria-hidden size={20} />}
       </button>
       <TryOnModeSelector mode={mode} onChange={onMode} compact />
       <div className="rail-tools">
@@ -56,8 +70,8 @@ export function SidebarRail({
           className="icon-button"
           aria-pressed={mirror}
           onClick={onToggleMirror}
-          aria-label="Mirror view"
-          title="Mirror view (M)"
+          aria-label={m.app.mirrorView}
+          title={withKey(m.app.mirrorView, 'M')}
         >
           <FlipHorizontal2 aria-hidden size={19} />
         </button>
@@ -66,8 +80,8 @@ export function SidebarRail({
           className="icon-button"
           aria-pressed={fullscreen}
           onClick={onToggleFullscreen}
-          aria-label="Fullscreen view"
-          title="Fullscreen (F)"
+          aria-label={m.app.fullscreenView}
+          title={withKey(m.view.fullscreen, 'F')}
         >
           {fullscreen ? <Minimize aria-hidden size={19} /> : <Expand aria-hidden size={19} />}
         </button>
@@ -75,18 +89,19 @@ export function SidebarRail({
           type="button"
           className="icon-button keyboard-only"
           onClick={onShortcuts}
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
+          aria-label={m.common.keyboardShortcuts}
+          title={withKey(m.common.keyboardShortcuts, '?')}
         >
           <Keyboard aria-hidden size={19} />
         </button>
+        <LanguageToggle className="icon-button lang-toggle" />
       </div>
       <button
         type="button"
         className="rail-mark"
         onClick={onAbout}
-        aria-label={`About this project — ${BRAND.university}`}
-        title={`${BRAND.projectKind} by ${BRAND.builder} · ${BRAND.university}`}
+        aria-label={m.common.aboutWith(m.brand.university)}
+        title={m.brand.kindBy(m.brand.projectKind, m.brand.builder, m.brand.university)}
       >
         <img src={BRAND.universityMark} alt="" width={40} height={25} />
       </button>

@@ -11,6 +11,8 @@ import {
 import { AnimatePresence, motion, type Variants } from 'motion/react';
 import type { EngineSnapshot } from '../app/MirrorEngine';
 import { describeStatus, type StatusMessage } from '../app/statusMessages';
+import { Accent } from '../i18n/format';
+import { useI18n } from '../i18n/I18nProvider';
 import { SourceControls } from './SourceControls';
 
 function ToneIcon({ tone, loading }: { tone: StatusMessage['tone']; loading: boolean }) {
@@ -20,25 +22,11 @@ function ToneIcon({ tone, loading }: { tone: StatusMessage['tone']; loading: boo
   return <TriangleAlert aria-hidden size={18} />;
 }
 
+/** Icon and colour of each welcome step; the text comes from `welcome.steps` in the same order. */
 const STEPS = [
-  {
-    icon: <Video aria-hidden size={20} />,
-    tone: 'blue',
-    title: 'Pick a source',
-    text: 'Webcam or video',
-  },
-  {
-    icon: <ScanFace aria-hidden size={20} />,
-    tone: 'violet',
-    title: 'Face the camera',
-    text: 'Shoulders in view',
-  },
-  {
-    icon: <Shirt aria-hidden size={20} />,
-    tone: 'pink',
-    title: 'Try on shirts',
-    text: 'Switch styles live',
-  },
+  { icon: <Video aria-hidden size={20} />, tone: 'blue' },
+  { icon: <ScanFace aria-hidden size={20} />, tone: 'violet' },
+  { icon: <Shirt aria-hidden size={20} />, tone: 'pink' },
 ] as const;
 
 const container: Variants = {
@@ -84,7 +72,8 @@ export function StageOverlay({
   onOpenFile: (file: File) => void;
   onOpenCamera: (deviceId?: string) => void;
 }) {
-  const status = describeStatus(snapshot);
+  const { m } = useI18n();
+  const status = describeStatus(snapshot, m.status);
   const loading = snapshot.tracker.state === 'loading' || snapshot.source.state === 'loading';
   const noSource = snapshot.source.state === 'none' || snapshot.source.state === 'error';
   return (
@@ -115,7 +104,7 @@ export function StageOverlay({
             </motion.div>
             {snapshot.tracker.state === 'error' && (
               <button type="button" className="button small" onClick={onRetryTracker}>
-                <RefreshCw aria-hidden size={16} /> Retry
+                <RefreshCw aria-hidden size={16} /> {m.common.retry}
               </button>
             )}
           </motion.div>
@@ -127,32 +116,33 @@ export function StageOverlay({
           <Aurora />
           <motion.div className="hero" variants={container} initial="hidden" animate="show">
             <motion.h1 variants={item}>
-              Virtual <span className="gradient-text">fitting mirror</span>
+              <Accent text={m.welcome.title} />
             </motion.h1>
             <motion.p variants={item} className="hero-lead">
-              Try on shirts live in 2D or 3D, or create an AI photo preview.
+              {m.welcome.lead}
             </motion.p>
             <motion.div variants={item} className="hero-actions">
               <SourceControls status={snapshot.source} onOpenFile={onOpenFile} onOpenCamera={onOpenCamera} />
             </motion.div>
             {snapshot.tracker.state === 'error' && (
               <motion.p variants={item} className="error-text">
-                Tracking could not start: {snapshot.tracker.message}{' '}
+                {m.welcome.trackerFailed}{' '}
+                {m.status.trackerError(snapshot.tracker.kind, snapshot.tracker.message)}{' '}
                 <button type="button" className="text-button" onClick={onRetryTracker}>
-                  Retry
+                  {m.common.retry}
                 </button>
               </motion.p>
             )}
             <motion.ol variants={item} className="hero-steps">
               {STEPS.map((s, i) => (
-                <li key={s.title} data-tone={s.tone}>
+                <li key={s.tone} data-tone={s.tone}>
                   <span className="step-icon" aria-hidden>
                     <span className="section-icon">{s.icon}</span>
                     <span className="step-number">{i + 1}</span>
                   </span>
                   <span className="step-text">
-                    <span className="step-title">{s.title}</span>
-                    <span className="step-detail">{s.text}</span>
+                    <span className="step-title">{m.welcome.steps[i]?.title}</span>
+                    <span className="step-detail">{m.welcome.steps[i]?.text}</span>
                   </span>
                 </li>
               ))}

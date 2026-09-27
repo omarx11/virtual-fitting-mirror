@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 import type { Garment3DStatus } from '../app/MirrorEngine';
 import { findCard, findMaterial, GARMENT_CARDS } from '../garments/catalogue';
 import type { Garment2DDefinition, GarmentDefinition } from '../garments/types';
+import { garmentText, materialLabel, swatchLabel } from '../i18n/catalogue';
+import { useI18n } from '../i18n/I18nProvider';
 
 /** The accent ring on the selected card; it glides between cards when the selection changes. */
 export function SelectedRing({ layoutId }: { layoutId: string }) {
@@ -56,6 +58,7 @@ export function GarmentPicker({
   status3d: Garment3DStatus;
   onRetry3d: () => void;
 }) {
+  const { m } = useI18n();
   const selected = garments.find((g) => g.id === selectedId);
   const material = selected?.kind === '3d' ? findMaterial(selected, materialId) : null;
   const selectedCard = findCard(selectedId);
@@ -72,13 +75,14 @@ export function GarmentPicker({
       : [];
   return (
     <fieldset className="garments">
-      <legend className="visually-hidden">Shirts</legend>
+      <legend className="visually-hidden">{m.app.sections.shirts}</legend>
       <div className="garment-grid">
         {GARMENT_CARDS.filter((card) => card.kind === kind).map((card) => {
           const active = card.id === selectedCard.id;
           const shownId = active ? selectedId : (lastChoice.current.get(card.id) ?? card.garmentIds[0]);
           const shown = garments.find((g) => g.id === shownId);
           if (!shown) return null;
+          const text = garmentText(m, card);
           return (
             <motion.button
               key={card.id}
@@ -88,39 +92,39 @@ export function GarmentPicker({
               onClick={() => {
                 if (!active) onSelect(shown.id);
               }}
-              title={card.description}
+              title={text.description}
               whileTap={{ scale: 0.95 }}
             >
               {active && <SelectedRing layoutId="garment-ring" />}
               <span className="garment-thumb">
                 <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
               </span>
-              <span className="garment-name">{card.name}</span>
+              <span className="garment-name">{text.name}</span>
             </motion.button>
           );
         })}
       </div>
       {selected?.kind === '3d' && (
-        <div className="swatches" role="radiogroup" aria-label="Fabric colour">
-          {selected.materials.map((m) => (
+        <div className="swatches" role="radiogroup" aria-label={m.garments.fabricColour}>
+          {selected.materials.map((option) => (
             <motion.button
-              key={m.id}
+              key={option.id}
               type="button"
               role="radio"
-              aria-checked={m.id === material?.id}
+              aria-checked={option.id === material?.id}
               className="swatch"
-              title={m.label}
-              onClick={() => onMaterial(m.id)}
+              title={materialLabel(m, option)}
+              onClick={() => onMaterial(option.id)}
               whileTap={{ scale: 0.94 }}
             >
-              <SwatchChip color={m.color} checked={m.id === material?.id} />
-              <span>{m.label}</span>
+              <SwatchChip color={option.color} checked={option.id === material?.id} />
+              <span>{materialLabel(m, option)}</span>
             </motion.button>
           ))}
         </div>
       )}
       {flatVariants.length > 1 && (
-        <div className="swatches" role="radiogroup" aria-label="Shirt colour">
+        <div className="swatches" role="radiogroup" aria-label={m.garments.shirtColour}>
           {flatVariants.map((g) => (
             <motion.button
               key={g.id}
@@ -128,36 +132,32 @@ export function GarmentPicker({
               role="radio"
               aria-checked={g.id === selectedId}
               className="swatch"
-              title={`${g.name} — ${g.description}`}
+              title={`${garmentText(m, g).name} — ${garmentText(m, g).description}`}
               onClick={() => onSelect(g.id)}
               whileTap={{ scale: 0.94 }}
             >
               <SwatchChip color={g.swatch.color} checked={g.id === selectedId} />
-              <span>{g.swatch.label}</span>
+              <span>{swatchLabel(m, g)}</span>
             </motion.button>
           ))}
         </div>
       )}
       {status3d.state === 'loading' && (
         <p className="hint" role="status">
-          Loading 3D shirt…
+          {m.garments.loading3d}
         </p>
       )}
       {status3d.state === 'error' && (
         <p className="error-text" role="alert">
           {status3d.fallback === 'legacy-2d'
-            ? `3D unavailable (${status3d.message}). Showing a flat 2D fallback image — not 3D.`
-            : `3D shirt unavailable: ${status3d.message}`}{' '}
+            ? m.garments.unavailable3dFallback(status3d.message)
+            : m.garments.unavailable3d(status3d.message)}{' '}
           <button type="button" className="text-button" onClick={onRetry3d}>
-            Retry
+            {m.common.retry}
           </button>
         </p>
       )}
-      <p className="hint">
-        {selected?.kind === '3d'
-          ? 'Neutral fabric colours; the model has no matching fabric texture yet.'
-          : 'Flat demo artwork (legacy 2D comparison).'}
-      </p>
+      <p className="hint">{selected?.kind === '3d' ? m.garments.hint3d : m.garments.hint2d}</p>
     </fieldset>
   );
 }

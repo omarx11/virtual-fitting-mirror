@@ -1,6 +1,7 @@
 import { Camera, FileVideo } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { SourceStatus } from '../app/MirrorEngine';
+import { useI18n } from '../i18n/I18nProvider';
 import { listCameras } from '../media/cameraSource';
 
 export function SourceControls({
@@ -14,6 +15,7 @@ export function SourceControls({
   onOpenCamera: (deviceId?: string) => void;
   compact?: boolean;
 }) {
+  const { m } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState('');
@@ -58,7 +60,7 @@ export function SourceControls({
       />
       <button type="button" className="button" onClick={() => inputRef.current?.click()} disabled={busy}>
         <FileVideo aria-hidden size={18} />
-        {compact ? 'Open video' : 'Open a video file'}
+        {compact ? m.source.openVideo : m.source.openVideoFile}
       </button>
       <button
         type="button"
@@ -67,11 +69,11 @@ export function SourceControls({
         disabled={busy}
       >
         <Camera aria-hidden size={18} />
-        {cameraActive ? 'Restart camera' : 'Use camera'}
+        {cameraActive ? m.source.restartCamera : m.source.useCamera}
       </button>
       {labelled.length > 1 && (
         <label className="camera-select">
-          <span>Camera</span>
+          <span>{m.source.camera}</span>
           <select
             value={deviceId}
             onChange={(e) => {
@@ -79,7 +81,7 @@ export function SourceControls({
               if (cameraActive) onOpenCamera(e.target.value || undefined);
             }}
           >
-            <option value="">Default</option>
+            <option value="">{m.source.defaultCamera}</option>
             {labelled.map((c) => (
               <option key={c.deviceId} value={c.deviceId}>
                 {c.label}
@@ -90,13 +92,15 @@ export function SourceControls({
       )}
       {status.state === 'error' && (
         <p className="error-text" role="alert">
-          {status.message}
+          {m.source.error(status.errorKind, status.message)}
         </p>
       )}
       {status.state === 'ready' && (
         <p className="hint source-label" title={status.label}>
-          {status.kind === 'camera' ? 'Live: ' : 'Playing: '}
-          {status.label} · {status.width}×{status.height}
+          {status.kind === 'camera' ? m.source.live : m.source.playing} <bdi>{status.label}</bdi> ·{' '}
+          <span dir="ltr">
+            {status.width}×{status.height}
+          </span>
         </p>
       )}
     </div>

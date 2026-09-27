@@ -211,3 +211,48 @@ test.describe('research page', () => {
     await expect(page.getByRole('link', { name: /Research, testing/ })).toHaveAttribute('href', '/research');
   });
 });
+
+test.describe('language', () => {
+  test('switches the whole app to Saudi Arabic, right to left, and remembers it', async ({ page }) => {
+    const errors = collectErrors(page);
+    await openApp(page);
+    await page.getByTestId('language-toggle').first().click();
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('dir', 'rtl');
+    await expect(html).toHaveAttribute('lang', 'ar-SA');
+    await expect(page).toHaveTitle('مرآة القياس الافتراضية');
+    await expect(page.getByRole('heading', { name: 'مرآة القياس الافتراضية' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'افتح ملف فيديو' })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'وضع التجربة' })).toBeVisible();
+    // The sidebar moves to the left of the mirror, and nothing spills sideways.
+    const panel = await page.getByRole('complementary').boundingBox();
+    const stage = await page.getByRole('main').boundingBox();
+    expect(panel && stage && panel.x < stage.x).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    // Status messages follow the language too.
+    await openFile(page, pattern);
+    await expect.poll(async () => (await snap(page)).source.state).toBe('ready');
+    await expect(page.getByTestId('status')).toContainText(/[\u0600-\u06FF]/);
+
+    await page.reload();
+    await page.waitForFunction(() => '__mirror' in window);
+    await expect(html).toHaveAttribute('dir', 'rtl');
+    // L switches back.
+    await page.keyboard.press('l');
+    await expect(html).toHaveAttribute('dir', 'ltr');
+    await expect(page.getByRole('heading', { name: 'Virtual fitting mirror' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('?lang=ar opens the research page in Arabic', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/research?lang=ar');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('كواليس المرآة');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('.rs-gallery img')).toHaveCount(4);
+    await page.getByTestId('language-toggle').click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Behind the mirror');
+    expect(errors).toEqual([]);
+  });
+});

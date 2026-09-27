@@ -38,6 +38,12 @@
   color: var(--text);
 }
 
+.rs-top-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .rs-top img {
   width: 40px;
   height: auto;
@@ -179,11 +185,15 @@
 .rs-pipeline li:not(:last-child)::after {
   content: "→";
   position: absolute;
-  right: -18px;
+  inset-inline-end: -18px;
   top: 50%;
   translate: 0 -50%;
   color: var(--text-dim);
   font-weight: 700;
+}
+
+[dir="rtl"] .rs-pipeline li:not(:last-child)::after {
+  content: "←";
 }
 
 .rs-pipeline .section-icon,
@@ -297,15 +307,15 @@
   position: absolute;
   top: 0;
   bottom: -4px;
-  left: calc(var(--label-w) + var(--gap) + (100% - var(--label-w) - var(--gap)) * var(--at));
-  border-left: 2px dashed var(--line-strong);
+  inset-inline-start: calc(var(--label-w) + var(--gap) + (100% - var(--label-w) - var(--gap)) * var(--at));
+  border-inline-start: 2px dashed var(--line-strong);
   pointer-events: none;
 }
 
 .rs-budget-label {
   position: absolute;
   top: 0;
-  left: 6px;
+  inset-inline-start: 6px;
   white-space: nowrap;
   color: var(--text-dim);
   font-size: 0.74rem;
@@ -366,7 +376,7 @@
   align-items: center;
   gap: 8px;
   font-size: 1.05rem;
-  padding-right: 60px;
+  padding-inline-end: 60px;
 }
 
 .rs-bug-icon {
@@ -387,7 +397,7 @@
 .rs-stamp {
   position: absolute;
   top: 14px;
-  right: 14px;
+  inset-inline-end: 14px;
   padding: 2px 8px;
   border: 2px solid var(--ok);
   border-radius: 6px;
@@ -477,7 +487,7 @@
   border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--status);
+  border-inline-start: 3px solid var(--status);
   font-size: 0.9rem;
 }
 
@@ -571,10 +581,11 @@
   .rs-pipeline .section-icon {
     grid-row: 1 / 3;
   }
-  .rs-pipeline li:not(:last-child)::after {
+  .rs-pipeline li:not(:last-child)::after,
+  [dir="rtl"] .rs-pipeline li:not(:last-child)::after {
     content: "↓";
-    right: auto;
-    left: 30px;
+    inset-inline-end: auto;
+    inset-inline-start: 30px;
     top: auto;
     bottom: -19px;
     translate: 0 0;
@@ -597,8 +608,8 @@
   }
   /* Keep the frame-budget label inside the chart: put it on the left of the line. */
   .rs-budget-label {
-    left: auto;
-    right: 6px;
+    inset-inline-start: auto;
+    inset-inline-end: 6px;
   }
   .rs-hero {
     padding-top: 36px;

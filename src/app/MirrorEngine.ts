@@ -70,9 +70,12 @@ export interface EngineSettings {
   delegate: DelegatePreference;
 }
 
+/** What the tracker is doing while it loads (the UI words it). */
+export type TrackerLoadingStep = 'model' | 'download' | 'runtime' | 'prepare';
+
 export type TrackerStatus =
   | { state: 'idle' }
-  | { state: 'loading'; message: string; progress: number | null }
+  | { state: 'loading'; step: TrackerLoadingStep; progress: number | null }
   | { state: 'ready'; info: EngineInfo; backend: BackendKind; note: string | null }
   | { state: 'error'; kind: InitErrorKind; message: string };
 
@@ -587,12 +590,12 @@ export class MirrorEngine {
         p.stage === 'model'
           ? {
               state: 'loading',
-              message: 'Downloading tracking model…',
+              step: 'download',
               progress: p.totalBytes ? p.loadedBytes / p.totalBytes : null,
             }
-          : { state: 'loading', message: 'Starting tracking runtime…', progress: null };
+          : { state: 'loading', step: 'runtime', progress: null };
     };
-    this.trackerStatus = { state: 'loading', message: 'Loading tracking model…', progress: 0 };
+    this.trackerStatus = { state: 'loading', step: 'model', progress: 0 };
     this.emit();
 
     let backend: PoseBackend | null = null;
@@ -638,7 +641,7 @@ export class MirrorEngine {
     }
 
     // Warm-up: the first GPU inference compiles shaders (seconds). Do it now, not on the user.
-    this.trackerStatus = { state: 'loading', message: 'Preparing tracker…', progress: null };
+    this.trackerStatus = { state: 'loading', step: 'prepare', progress: null };
     this.emit();
     try {
       const blank = await createImageBitmap(new ImageData(64, 64));

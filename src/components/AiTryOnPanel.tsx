@@ -4,7 +4,13 @@ import { useRef, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
 import type { AiGarmentCategory, AiGarmentPhotoType } from '../ai/types';
 import { AI_GARMENTS, findAiGarment } from '../garments/aiCatalogue';
+import { aiGarmentText } from '../i18n/catalogue';
+import { withCode } from '../i18n/format';
+import { useI18n } from '../i18n/I18nProvider';
 import { SelectedRing } from './GarmentPicker';
+
+const CATEGORIES: readonly AiGarmentCategory[] = ['tops', 'bottoms', 'one-pieces'];
+const PHOTO_TYPES: readonly AiGarmentPhotoType[] = ['auto', 'flat-lay', 'model'];
 
 /**
  * Side-panel controls for AI mode: garment choice (product photos), operator setup when AI is
@@ -23,6 +29,7 @@ export function AiTryOnPanel({
   onPhotoFile: (file: File) => void;
   onEndSession: () => void;
 }) {
+  const { m } = useI18n();
   const photoRef = useRef<HTMLInputElement>(null);
   const garmentRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<AiGarmentCategory>('tops');
@@ -35,71 +42,60 @@ export function AiTryOnPanel({
 
   return (
     <div className="ai-panel">
-      <p className="hint lead">
-        Take a photo, choose a garment and generate one still image. This is not live, and not a size or fit
-        guide: colours, logos and details may differ from the real product.
-      </p>
+      <p className="hint lead">{m.ai.panelLead}</p>
 
       {state.unavailable && (
         <div className="ai-unavailable" role="status" data-testid="ai-unavailable">
           <p>
-            <TriangleAlert aria-hidden size={16} /> <strong>AI preview is unavailable.</strong>{' '}
-            {state.unavailable.reason}
+            <TriangleAlert aria-hidden size={16} /> <strong>{m.ai.unavailableTitle}</strong>{' '}
+            {withCode(m.ai.unavailableReason(state.unavailable.reason, state.unavailable.backendDown))}
           </p>
           <details>
-            <summary>Setup (staff)</summary>
+            <summary>{m.ai.setup}</summary>
             <ol>
-              <li>
-                Copy <code>.env.example</code> to <code>.env</code> in the project folder.
-              </li>
-              <li>
-                On this computer, set <code>FASHN_API_KEY</code> to your FASHN API key and{' '}
-                <code>AI_ENABLED=true</code>. Never put the key in a <code>VITE_</code> variable.
-              </li>
-              <li>
-                Restart with <code>npm run dev</code> (or <code>npm run build</code> then{' '}
-                <code>npm start</code>).
-              </li>
+              {m.ai.setupSteps.map((step) => (
+                <li key={step}>{withCode(step)}</li>
+              ))}
             </ol>
-            <p className="hint">2D and 3D keep working without it.</p>
+            <p className="hint">{m.ai.setupKeepsWorking}</p>
           </details>
         </div>
       )}
 
       <fieldset className="garments" disabled={generating}>
-        <legend className="field-label">Garment photo</legend>
-        <div className="garment-grid" role="radiogroup" aria-label="AI garment">
-          {AI_GARMENTS.map((g) => (
-            <motion.button
-              key={g.id}
-              type="button"
-              role="radio"
-              aria-checked={choice?.kind === 'catalogue' && choice.id === g.id}
-              className="garment"
-              title={`${g.label} — ${g.description}`}
-              onClick={() => onSelectGarment(g.id)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {choice?.kind === 'catalogue' && choice.id === g.id && (
-                <SelectedRing layoutId="ai-garment-ring" />
-              )}
-              <span className="garment-thumb photo">
-                <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
-              </span>
-              <span className="garment-name">{g.label}</span>
-              {g.demo && <span className="badge badge-flat">Demo</span>}
-            </motion.button>
-          ))}
+        <legend className="field-label">{m.ai.garmentPhoto}</legend>
+        <div className="garment-grid" role="radiogroup" aria-label={m.ai.garmentGroup}>
+          {AI_GARMENTS.map((g) => {
+            const text = aiGarmentText(m, g);
+            const checked = choice?.kind === 'catalogue' && choice.id === g.id;
+            return (
+              <motion.button
+                key={g.id}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                className="garment"
+                title={`${text.label} — ${text.description}`}
+                onClick={() => onSelectGarment(g.id)}
+                whileTap={{ scale: 0.95 }}
+              >
+                {checked && <SelectedRing layoutId="ai-garment-ring" />}
+                <span className="garment-thumb photo">
+                  <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
+                </span>
+                <span className="garment-name">{text.label}</span>
+                {g.demo && <span className="badge badge-flat">{m.ai.demo}</span>}
+              </motion.button>
+            );
+          })}
         </div>
-        {selected && <p className="hint">{selected.provenance}</p>}
-        {choice?.kind === 'upload' && (
-          <p className="hint">Uploaded garment photo — a technical test, not a validated shop product.</p>
-        )}
+        {selected && <p className="hint">{aiGarmentText(m, selected).provenance}</p>}
+        {choice?.kind === 'upload' && <p className="hint">{m.ai.uploadedHint}</p>}
       </fieldset>
 
       {caps?.devUploads && (
         <details className="ai-dev">
-          <summary>Developer test inputs</summary>
+          <summary>{m.ai.devInputs}</summary>
           <input
             ref={photoRef}
             type="file"
@@ -120,7 +116,7 @@ export function AiTryOnPanel({
             onClick={() => photoRef.current?.click()}
             disabled={generating}
           >
-            <ImageUp aria-hidden size={18} /> Use a photo instead of the camera
+            <ImageUp aria-hidden size={18} /> {m.ai.usePhoto}
           </button>
           <input
             ref={garmentRef}
@@ -135,7 +131,7 @@ export function AiTryOnPanel({
               if (file)
                 controller.selectUploadedGarment(
                   file,
-                  `Uploaded: ${file.name.slice(0, 40)}`,
+                  m.ai.uploadedLabel(file.name.slice(0, 40)),
                   category,
                   photoType,
                 );
@@ -144,19 +140,23 @@ export function AiTryOnPanel({
           />
           <div className="ai-dev-row">
             <label className="inline-select">
-              <span>Category</span>
+              <span>{m.ai.category}</span>
               <select value={category} onChange={(e) => setCategory(e.target.value as AiGarmentCategory)}>
-                <option value="tops">Tops</option>
-                <option value="bottoms">Bottoms</option>
-                <option value="one-pieces">One-pieces</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {m.ai.categories[c]}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="inline-select">
-              <span>Photo</span>
+              <span>{m.ai.photoType}</span>
               <select value={photoType} onChange={(e) => setPhotoType(e.target.value as AiGarmentPhotoType)}>
-                <option value="auto">Auto</option>
-                <option value="flat-lay">Flat-lay / ghost</option>
-                <option value="model">On model</option>
+                {PHOTO_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {m.ai.photoTypes[t]}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -166,22 +166,19 @@ export function AiTryOnPanel({
             onClick={() => garmentRef.current?.click()}
             disabled={generating}
           >
-            <ImageUp aria-hidden size={18} /> Upload a garment photo
+            <ImageUp aria-hidden size={18} /> {m.ai.uploadGarment}
           </button>
-          <p className="hint">Test inputs only; uploads are validated by the server and never stored.</p>
+          <p className="hint">{m.ai.devHint}</p>
         </details>
       )}
 
       {hasCustomerData && (
         <button type="button" className="button" onClick={onEndSession} data-testid="ai-end-session">
-          <LogOut aria-hidden size={18} /> End session
+          <LogOut aria-hidden size={18} className="rtl-flip" /> {m.common.endSession}
         </button>
       )}
 
-      <p className="footnote">
-        AI mode is the only feature that uploads anything: the photo goes to the cloud service FASHN, only
-        after you agree. 2D and 3D stay on this device.
-      </p>
+      <p className="footnote">{m.ai.footnote}</p>
     </div>
   );
 }

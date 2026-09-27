@@ -175,7 +175,7 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   background:
     radial-gradient(120% 50% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
     radial-gradient(90% 40% at 0% 100%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 70%),
@@ -199,7 +199,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 12px 12px 16px;
+  padding-block: 14px 12px;
+  padding-inline: 16px 12px;
   border-bottom: 1px solid var(--line);
   flex: none;
 }
@@ -228,7 +229,7 @@ button {
 .brand-spark {
   position: absolute;
   top: 4px;
-  right: 4px;
+  inset-inline-end: 4px;
 }
 
 .brand-text {
@@ -332,7 +333,7 @@ button {
   .app[data-sidebar="folded"] .panel {
     width: auto;
     max-height: 58dvh;
-    border-left: 0;
+    border-inline-start: 0;
     border-top: 1px solid var(--line-strong);
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -18px 40px -24px rgba(0, 0, 0, 0.8);
@@ -388,9 +389,10 @@ button {
   }
   .rail-tools {
     flex-direction: row;
-    padding: 0 0 0 10px;
+    padding: 0;
+    padding-inline-start: 10px;
     border-top: 0;
-    border-left: 1px solid var(--line);
+    border-inline-start: 1px solid var(--line);
   }
   .rail-mark {
     display: none;
@@ -449,7 +451,7 @@ button {
   padding: 10px 0;
   border: 0;
   background: none;
-  text-align: left;
+  text-align: start;
   font-weight: inherit;
   cursor: pointer;
 }
@@ -460,7 +462,7 @@ button {
 
 .card-chevron {
   display: inline-grid;
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--text-dim);
   transition: transform 0.2s ease;
 }
@@ -774,7 +776,8 @@ select {
     var(--surface-2);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  padding: 6px 30px 6px 10px;
+  padding-block: 6px;
+  padding-inline: 10px 30px;
   min-height: 38px;
   color: var(--text);
   cursor: pointer;
@@ -809,7 +812,7 @@ input[type="range"] {
 }
 
 .rate {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .scrubber {
@@ -1006,7 +1009,7 @@ input[type="range"] {
 .garment-check {
   position: absolute;
   top: 5px;
-  right: 5px;
+  inset-inline-end: 5px;
   display: grid;
   place-items: center;
   width: 20px;
@@ -1019,7 +1022,7 @@ input[type="range"] {
 .badge {
   position: absolute;
   top: 6px;
-  left: 6px;
+  inset-inline-start: 6px;
   padding: 1px 6px;
   border-radius: 6px;
   font-size: 0.64rem;
@@ -1090,7 +1093,7 @@ input[type="range"] {
 }
 
 .slider-row output {
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
   font-size: 0.84rem;
@@ -1111,7 +1114,7 @@ input[type="range"] {
   min-height: 46px;
   font-size: 0.82rem;
   font-weight: 600;
-  text-align: left;
+  text-align: start;
   border-radius: 14px;
 }
 
@@ -1240,7 +1243,7 @@ input[type="range"] {
 }
 
 .tuning-row output {
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
 }
@@ -1256,13 +1259,13 @@ input[type="range"] {
 .usage-table th,
 .usage-table td {
   padding: 3px 4px;
-  text-align: right;
+  text-align: end;
   border-bottom: 1px solid var(--line);
 }
 
 .usage-table th:first-child,
 .usage-table td:first-child {
-  text-align: left;
+  text-align: start;
 }
 
 .usage-table th {
@@ -1286,7 +1289,7 @@ input[type="range"] {
     rgba(90, 168, 255, 0.1) 50%,
     rgba(255, 111, 165, 0.12)
   );
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 
@@ -1543,7 +1546,7 @@ input[type="range"] {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
-  text-align: left;
+  text-align: start;
 }
 
 .step-text {
@@ -1567,7 +1570,7 @@ input[type="range"] {
 .step-number {
   position: absolute;
   top: -6px;
-  right: -6px;
+  inset-inline-end: -6px;
   display: grid;
   place-items: center;
   width: 18px;
@@ -1714,7 +1717,7 @@ input[type="range"] {
   margin: 0;
   color: var(--text-dim);
   font-size: 0.88rem;
-  text-align: right;
+  text-align: end;
 }
 
 kbd {
@@ -2132,7 +2135,7 @@ kbd {
 }
 
 .ai-consent ul {
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .ai-consent summary {
@@ -2181,7 +2184,7 @@ kbd {
 }
 
 .ai-unavailable ol {
-  padding-left: 18px;
+  padding-inline-start: 18px;
   margin: 6px 0;
 }
 
@@ -2227,6 +2230,68 @@ kbd {
     padding: 12px;
     gap: 8px;
   }
+}
+
+/* ---- Arabic & right-to-left ------------------------------------------------------------------------
+   Layout rules above use logical properties (inline-start/end), so the grid, the sidebar and text
+   alignment mirror by themselves under dir="rtl". This section covers what cannot flip on its own. */
+
+:root:lang(ar) {
+  /* IBM Plex Sans Arabic (Saudi DGA platform typeface) for Arabic; Latin words keep Plus Jakarta Sans. */
+  font-family:
+    "Plus Jakarta Sans Variable", "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma,
+    sans-serif;
+  line-height: 1.6;
+}
+
+/* Letter-spacing breaks the joins between Arabic letters, and Arabic has no capitals to space out.
+   (Specificity 0,2,0 outranks every letter-spacing rule here, which are all one class + element.) */
+:root:lang(ar) * {
+  letter-spacing: normal;
+}
+
+/* Arrows and "exit" icons point along the reading direction. */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] select {
+  background-position:
+    left 10px center,
+    0 0;
+}
+
+[dir="rtl"] .diagnostics:not([open]) .card-chevron {
+  transform: rotate(90deg);
+}
+
+[dir="rtl"] .progress-track {
+  transform: scaleX(-1);
+}
+
+/* Media times, sizes and codes read left to right inside Arabic text. */
+[dir="rtl"] .time,
+[dir="rtl"] .diag-grid dd,
+[dir="rtl"] .usage-table td,
+[dir="rtl"] kbd,
+[dir="rtl"] code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* A command split over two lines reads in the wrong order in Arabic: keep each one whole. */
+[dir="rtl"] code {
+  white-space: nowrap;
+}
+
+/* The language switch shows the other language's name instead of an icon. */
+.lang-toggle {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.lang-toggle span:lang(ar) {
+  font-size: 0.9rem;
 }
 
 /* ---- Reduced motion: Motion components already honour it (MotionConfig); CSS animations too. ---- */

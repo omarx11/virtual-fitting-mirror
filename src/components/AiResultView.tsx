@@ -12,20 +12,19 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
 import { AI_PROVIDER_RETENTION_URL } from '../ai/types';
-
-const STAGE_LABELS: Record<string, string> = {
-  submitting: 'Uploading your photo to the AI service…',
-  queued: 'Waiting in the AI service queue…',
-  generating: 'Generating your preview…',
-};
+import { aiChoiceLabel } from '../i18n/catalogue';
+import { useI18n } from '../i18n/I18nProvider';
 
 function Elapsed({ startedAt, now }: { startedAt: number; now: () => number }) {
+  const { m } = useI18n();
   const [, tick] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => tick((n) => n + 1), 250);
     return () => window.clearInterval(id);
   }, []);
-  return <span data-testid="ai-elapsed">{Math.max(0, (now() - startedAt) / 1000).toFixed(0)} s</span>;
+  return (
+    <span data-testid="ai-elapsed">{m.ai.seconds(Math.max(0, Math.round((now() - startedAt) / 1000)))}</span>
+  );
 }
 
 function Still({ src, mirror, alt, testId }: { src: string; mirror: boolean; alt: string; testId: string }) {
@@ -58,6 +57,8 @@ function ConsentDialog({
   onAccept: () => void;
   onDecline: () => void;
 }) {
+  const { m } = useI18n();
+  const body = m.ai.consentBody;
   return (
     <motion.div
       className="ai-consent"
@@ -72,40 +73,30 @@ function ConsentDialog({
       <span className="ai-consent-icon" aria-hidden>
         <Sparkles size={22} />
       </span>
-      <h2 id="ai-consent-title">Send your photo for an AI preview?</h2>
-      {testProvider && (
-        <p className="ai-test-note">
-          Test mode: the offline fake provider is active. Nothing leaves this computer and the result is not
-          AI.
-        </p>
-      )}
+      <h2 id="ai-consent-title">{m.ai.consentTitle}</h2>
+      {testProvider && <p className="ai-test-note">{m.ai.consentTest}</p>}
       <p>
-        Your captured photo and the garment image are sent to <strong>FASHN</strong>, a cloud AI service, to
-        generate one still image. Nothing is uploaded until you agree.
+        {body.pre}
+        <strong>{body.accent}</strong>
+        {body.post}
       </p>
       <details>
-        <summary>What happens to the photo?</summary>
+        <summary>{m.ai.consentMore}</summary>
         <ul>
-          <li>
-            This device keeps the photo and result only in memory and deletes them when you end the session.
-          </li>
-          <li>
-            FASHN deletes its temporary copy of the photo after processing; the generated image stays
-            retrievable there for up to 60 minutes, and request records (without images) are kept. FASHN
-            states it does not train on customer content.
-          </li>
-          <li>Ending the session here cannot delete data already held by FASHN.</li>
+          {m.ai.consentPoints.map((point) => (
+            <li key={point}>{point}</li>
+          ))}
         </ul>
         <a href={AI_PROVIDER_RETENTION_URL} target="_blank" rel="noreferrer noopener">
-          FASHN data retention &amp; privacy
+          {m.ai.consentLink}
         </a>
       </details>
       <div className="ai-actions">
         <button type="button" className="button" onClick={onDecline}>
-          Not now
+          {m.ai.notNow}
         </button>
         <button type="button" className="button primary" onClick={onAccept}>
-          Agree &amp; generate
+          {m.ai.agree}
         </button>
       </div>
     </motion.div>
@@ -119,6 +110,7 @@ function ConsentDialog({
  */
 export function AiResultView({
   state,
+  captureError = null,
   controller,
   mirror,
   canCapture,
@@ -128,6 +120,8 @@ export function AiResultView({
   now,
 }: {
   state: AiViewState;
+  /** A capture problem found before anything reached the controller (shown in the live bar). */
+  captureError?: string | null;
   controller: AiTryOnController;
   mirror: boolean;
   canCapture: boolean;
@@ -136,6 +130,7 @@ export function AiResultView({
   onEndSession: () => void;
   now: () => number;
 }) {
+  const { m } = useI18n();
   const [compare, setCompare] = useState<'after' | 'before' | 'split'>('after');
   const resultUrl = state.result?.url;
   // biome-ignore lint/correctness/useExhaustiveDependencies: every new result opens on the generated image.
@@ -143,30 +138,29 @@ export function AiResultView({
 
   const { phase, capture, result, job, error } = state;
   const active = phase === 'submitting' || phase === 'queued' || phase === 'generating';
-  const garmentLabel = state.garment?.label ?? null;
+  // Changing the garment drops any result, so the current choice also names the shown result.
+  const garmentLabel = aiChoiceLabel(m, state.garment);
+  const errorText = error ? m.ai.error(error.code, error.message) : null;
 
   if (phase === 'inactive') return null;
 
   if (!capture) {
+    const liveError = captureError ?? errorText;
     // Live preview: plain video underneath, no garment drawn.
     return (
       <motion.div className="ai-bar" data-testid="ai-live-bar" {...barMotion}>
-        {phase === 'checking' && <p className="hint">Checking the AI service…</p>}
+        {phase === 'checking' && <p className="hint">{m.ai.checking}</p>}
         {phase === 'unconfigured' && (
           <p className="ai-bar-text">
-            <TriangleAlert aria-hidden size={18} /> AI preview is unavailable on this device. See the panel
-            for details.
+            <TriangleAlert aria-hidden size={18} /> {m.ai.unconfigured}
           </p>
         )}
         {(phase === 'ready' || phase === 'error') && (
           <>
-            <p className="ai-bar-text">
-              Face the camera with your upper body in view and your arms slightly away from your body, then
-              take a photo.
-            </p>
-            {error && (
+            <p className="ai-bar-text">{m.ai.instructions}</p>
+            {liveError && (
               <p className="error-text" role="alert">
-                {error.message}
+                {liveError}
               </p>
             )}
             <button
@@ -175,7 +169,7 @@ export function AiResultView({
               onClick={onCapture}
               disabled={!canCapture}
             >
-              <Camera aria-hidden size={20} /> Capture photo
+              <Camera aria-hidden size={20} /> {m.ai.capture}
             </button>
           </>
         )}
@@ -184,6 +178,7 @@ export function AiResultView({
   }
 
   const showResult = phase === 'result' && result;
+  const resultLabel = garmentLabel ?? result?.garmentLabel ?? '';
   return (
     <div className="ai-stage" data-testid="ai-stage">
       {/* A soft camera flash each time a new photo is taken. */}
@@ -200,30 +195,20 @@ export function AiResultView({
           <>
             {(compare === 'before' || compare === 'split') && (
               <figure>
-                <Still
-                  src={capture.url}
-                  mirror={mirror}
-                  alt="Your photo before the AI preview"
-                  testId="ai-before"
-                />
-                <figcaption>Before</figcaption>
+                <Still src={capture.url} mirror={mirror} alt={m.ai.beforeAlt} testId="ai-before" />
+                <figcaption>{m.ai.before}</figcaption>
               </figure>
             )}
             {(compare === 'after' || compare === 'split') && (
               <figure>
-                <Still
-                  src={result.url}
-                  mirror={mirror}
-                  alt={`AI-generated preview: ${result.garmentLabel}`}
-                  testId="ai-result"
-                />
-                <figcaption>After</figcaption>
+                <Still src={result.url} mirror={mirror} alt={m.ai.afterAlt(resultLabel)} testId="ai-result" />
+                <figcaption>{m.ai.after}</figcaption>
               </figure>
             )}
           </>
         ) : (
           <figure>
-            <Still src={capture.url} mirror={mirror} alt="Your captured photo" testId="ai-capture" />
+            <Still src={capture.url} mirror={mirror} alt={m.ai.captureAlt} testId="ai-capture" />
           </figure>
         )}
       </div>
@@ -231,12 +216,13 @@ export function AiResultView({
       <div className="ai-label" data-testid="ai-label">
         {showResult ? (
           <>
-            <Sparkles aria-hidden size={16} /> <strong>AI-generated preview</strong> · {result.garmentLabel}
-            {result.testResult && <span className="badge badge-test">TEST RESULT · not AI</span>}
+            <Sparkles aria-hidden size={16} /> <strong>{m.ai.generatedLabel}</strong> · {resultLabel}
+            {result.testResult && <span className="badge badge-test">{m.ai.testBadge}</span>}
           </>
         ) : (
           <>
-            <Camera aria-hidden size={16} /> Your photo{garmentLabel ? ` · ${garmentLabel}` : ''}
+            <Camera aria-hidden size={16} /> {m.ai.yourPhoto}
+            {garmentLabel ? ` · ${garmentLabel}` : ''}
           </>
         )}
       </div>
@@ -255,20 +241,21 @@ export function AiResultView({
       <motion.div className="ai-bar" {...barMotion}>
         {active && job && (
           <p className="ai-progress" role="status" aria-live="polite" data-testid="ai-progress">
-            <LoaderCircle aria-hidden size={18} className="spin" /> {STAGE_LABELS[phase]}{' '}
+            <LoaderCircle aria-hidden size={18} className="spin" /> {m.ai.stages[phase]}{' '}
             <Elapsed startedAt={job.startedAt} now={now} />
           </p>
         )}
         {active && <span className="progress-track" aria-hidden />}
-        {state.notice && <p className="hint">{state.notice}</p>}
-        {phase === 'error' && error && (
+        {/* The controller's only notice is the reconnect message. */}
+        {state.notice && <p className="hint">{m.ai.reconnecting}</p>}
+        {phase === 'error' && errorText && (
           <p className="error-text" role="alert" data-testid="ai-error">
-            {error.message}
+            {errorText}
           </p>
         )}
         {showResult && (
           <>
-            <div className="segmented" role="radiogroup" aria-label="Compare">
+            <div className="segmented" role="radiogroup" aria-label={m.ai.compare}>
               {(['before', 'after', 'split'] as const).map((v) => (
                 // biome-ignore lint/a11y/useSemanticElements: a segmented control with radio semantics.
                 <button
@@ -288,24 +275,21 @@ export function AiResultView({
                   )}
                   <span className="segment-content">
                     {v === 'split' ? <Columns2 aria-hidden size={16} /> : null}
-                    {v === 'before' ? 'Before' : v === 'after' ? 'After' : 'Side by side'}
+                    {v === 'before' ? m.ai.before : v === 'after' ? m.ai.after : m.ai.sideBySide}
                   </span>
                 </button>
               ))}
             </div>
-            <p className="hint">
-              AI-generated: colours, logos, fit and details may differ from the real garment. Not a size
-              guide.
-            </p>
+            <p className="hint">{m.ai.disclaimer}</p>
           </>
         )}
         <div className="ai-actions">
           <button type="button" className="button" onClick={onRetake}>
-            <RotateCcw aria-hidden size={18} /> Retake
+            <RotateCcw aria-hidden size={18} /> {m.ai.retake}
           </button>
           {showResult || phase === 'error' ? (
             <button type="button" className="button" onClick={() => controller.tryAnother()}>
-              <Shirt aria-hidden size={18} /> Try another garment
+              <Shirt aria-hidden size={18} /> {m.ai.tryAnother}
             </button>
           ) : null}
           {!showResult && (
@@ -314,23 +298,19 @@ export function AiResultView({
               className="button primary large"
               onClick={() => controller.requestGenerate()}
               disabled={active || phase === 'consent' || !controller.readyToGenerate()}
-              title={garmentLabel ? undefined : 'Choose a garment first'}
+              title={garmentLabel ? undefined : m.ai.chooseFirst}
             >
-              <Sparkles aria-hidden size={20} /> {phase === 'error' ? 'Generate again' : 'Generate preview'}
+              <Sparkles aria-hidden size={20} /> {phase === 'error' ? m.ai.generateAgain : m.ai.generate}
             </button>
           )}
           {showResult && (
             <button type="button" className="button" onClick={onEndSession}>
-              <LogOut aria-hidden size={18} /> End session
+              <LogOut aria-hidden size={18} className="rtl-flip" /> {m.common.endSession}
             </button>
           )}
         </div>
-        {active && (
-          <p className="hint">
-            Retake stops waiting here; a request already sent may still be processed and counted.
-          </p>
-        )}
-        {!showResult && !active && !garmentLabel && <p className="hint">Choose a garment in the panel.</p>}
+        {active && <p className="hint">{m.ai.retakeNote}</p>}
+        {!showResult && !active && !garmentLabel && <p className="hint">{m.ai.choosePanel}</p>}
       </motion.div>
     </div>
   );

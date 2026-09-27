@@ -5,6 +5,7 @@ import {
   USER_SCALE_RANGE,
   type UserFitAdjustment,
 } from '../fitting/garmentFit';
+import { useI18n } from '../i18n/I18nProvider';
 
 export function FitControls({
   fit,
@@ -13,15 +14,16 @@ export function FitControls({
   fit: UserFitAdjustment;
   onChange: (fit: UserFitAdjustment) => void;
 }) {
+  const { m } = useI18n();
   const scaleId = useId();
   const offsetId = useId();
   const isDefault =
     fit.scale === DEFAULT_USER_FIT.scale && fit.verticalOffset === DEFAULT_USER_FIT.verticalOffset;
   return (
     <fieldset className="fit">
-      <legend className="visually-hidden">Adjust fit</legend>
+      <legend className="visually-hidden">{m.app.sections.fit}</legend>
       <div className="slider-row">
-        <label htmlFor={scaleId}>Size</label>
+        <label htmlFor={scaleId}>{m.fit.size}</label>
         <input
           id={scaleId}
           type="range"
@@ -30,12 +32,12 @@ export function FitControls({
           step={0.01}
           value={fit.scale}
           onChange={(e) => onChange({ ...fit, scale: Number(e.target.value) })}
-          aria-valuetext={`${Math.round(fit.scale * 100)} percent`}
+          aria-valuetext={m.fit.percent(Math.round(fit.scale * 100))}
         />
         <output htmlFor={scaleId}>{Math.round(fit.scale * 100)}%</output>
       </div>
       <div className="slider-row">
-        <label htmlFor={offsetId}>Height</label>
+        <label htmlFor={offsetId}>{m.fit.height}</label>
         <input
           id={offsetId}
           type="range"
@@ -44,7 +46,9 @@ export function FitControls({
           step={0.01}
           value={-fit.verticalOffset}
           onChange={(e) => onChange({ ...fit, verticalOffset: -Number(e.target.value) })}
-          aria-valuetext={fit.verticalOffset === 0 ? 'default' : fit.verticalOffset < 0 ? 'higher' : 'lower'}
+          aria-valuetext={
+            fit.verticalOffset === 0 ? m.fit.default : fit.verticalOffset < 0 ? m.fit.higher : m.fit.lower
+          }
         />
         <output htmlFor={offsetId}>
           {fit.verticalOffset === 0
@@ -58,7 +62,7 @@ export function FitControls({
         onClick={() => onChange(DEFAULT_USER_FIT)}
         disabled={isDefault}
       >
-        Reset fit
+        {m.fit.reset}
       </button>
     </fieldset>
   );

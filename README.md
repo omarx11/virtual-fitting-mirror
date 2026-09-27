@@ -156,8 +156,16 @@ Status messages on the video: **Tracking**, **Upper-body view** (hips out of fra
 **Tracking lost**, or a tracking error with **Retry**.
 
 Keyboard: `Space` play/pause · `[` `]` previous/next shirt · `G` shirt on/off · `M` mirror ·
-`F` fullscreen · `S` fold/unfold the sidebar · `D` diagnostics · `?` list of shortcuts · `Esc`
-closes a dialog. All controls are reachable with `Tab`.
+`F` fullscreen · `S` fold/unfold the sidebar · `D` diagnostics · `L` English / Arabic · `?` list of
+shortcuts · `Esc` closes a dialog. All controls are reachable with `Tab`.
+
+**Language:** English or Arabic (Saudi), switched with the **عربي / EN** button in the sidebar header,
+the folded rail or the research page, or with `L`. Arabic lays the whole page out right to left. The
+choice is remembered; the first visit follows the browser language, and `?lang=ar` / `?lang=en` in the
+address (e.g. a kiosk shortcut) sets it directly. Shopper guidance uses a friendly Saudi register;
+privacy, consent and staff text stay in clear standard Arabic. Text lives in `src/i18n/en.ts` and
+`src/i18n/ar.ts` (the research page's in `src/research/messages.ts`); a unit test fails if an Arabic
+message is missing or left in English.
 
 **Sidebar:** fold it (`S` or the panel button) to an icon rail with the mode switch, mirror and
 fullscreen; each section (Source, Shirts, Fit, View) also folds on its own. The layout is remembered.
@@ -242,6 +250,7 @@ send the header `Content-Security-Policy: connect-src 'self' ws: wss: blob: data
 src/app/          engine (non-React core), hooks, low-rate state, preferences (2D/3D/AI mode)
 src/ai/           AI mode: API contract types, same-origin client, capture helpers, state machine, hook
 src/components/   controls, catalogue, status, diagnostics, dialogs; ui/ (modal, cards, toasts)
+src/i18n/         English + Arabic (Saudi) messages, locale choice (?lang=, remembered), RTL helpers
 src/assets/brand/ web-sized university logo + mark (generated from assets/brand/)
 src/media/        file/camera sources, frame loop (requestVideoFrameCallback)
 src/tracking/     worker protocol, MediaPipe engine, backends, scheduler

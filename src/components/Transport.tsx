@@ -1,6 +1,8 @@
 import { Pause, Play, Repeat, RotateCcw } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { MirrorEngine, PlaybackState } from '../app/MirrorEngine';
+import { withKey } from '../i18n/format';
+import { useI18n } from '../i18n/I18nProvider';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -12,6 +14,7 @@ function formatTime(seconds: number): string {
 const RATES = [0.5, 1, 1.5] as const;
 
 export function Transport({ engine, playback }: { engine: MirrorEngine; playback: PlaybackState }) {
+  const { m } = useI18n();
   const rangeRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLSpanElement>(null);
   const dragging = useRef(false);
@@ -38,8 +41,8 @@ export function Transport({ engine, playback }: { engine: MirrorEngine; playback
           type="button"
           className="icon-button primary"
           onClick={() => engine.togglePlay()}
-          aria-label={playing ? 'Pause' : 'Play'}
-          title={playing ? 'Pause (Space)' : 'Play (Space)'}
+          aria-label={playing ? m.transport.pause : m.transport.play}
+          title={withKey(playing ? m.transport.pause : m.transport.play, m.keys.Space ?? 'Space')}
         >
           {playing ? <Pause aria-hidden size={20} /> : <Play aria-hidden size={20} />}
         </button>
@@ -47,8 +50,8 @@ export function Transport({ engine, playback }: { engine: MirrorEngine; playback
           type="button"
           className="icon-button"
           onClick={() => engine.restart()}
-          aria-label="Restart"
-          title="Restart"
+          aria-label={m.transport.restart}
+          title={m.transport.restart}
         >
           <RotateCcw aria-hidden size={18} />
         </button>
@@ -57,13 +60,13 @@ export function Transport({ engine, playback }: { engine: MirrorEngine; playback
           className="icon-button"
           aria-pressed={playback.loop}
           onClick={() => engine.setLoop(!playback.loop)}
-          aria-label="Loop"
-          title={playback.loop ? 'Loop on' : 'Loop off'}
+          aria-label={m.transport.loop}
+          title={playback.loop ? m.transport.loopOn : m.transport.loopOff}
         >
           <Repeat aria-hidden size={18} />
         </button>
         <label className="rate">
-          <span className="visually-hidden">Playback speed</span>
+          <span className="visually-hidden">{m.transport.speed}</span>
           <select value={playback.rate} onChange={(e) => engine.setPlaybackRate(Number(e.target.value))}>
             {RATES.map((r) => (
               <option key={r} value={r}>
@@ -84,7 +87,7 @@ export function Transport({ engine, playback }: { engine: MirrorEngine; playback
           max={duration || 0}
           step={0.01}
           defaultValue={0}
-          aria-label="Seek"
+          aria-label={m.transport.seek}
           disabled={!duration}
           onPointerDown={() => {
             dragging.current = true;

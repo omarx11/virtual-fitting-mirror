@@ -26,7 +26,7 @@ describe('describeStatus', () => {
 
   it('shows loading progress while the model loads', () => {
     const s = describeStatus({
-      tracker: { state: 'loading', message: 'Downloading', progress: 0.5 },
+      tracker: { state: 'loading', step: 'download', progress: 0.5 },
       source,
       phase: 'searching',
     });

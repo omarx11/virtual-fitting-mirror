@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef } from 'react';
+import { useI18n } from '../../i18n/I18nProvider';
 
 /**
  * An animated modal dialog. Focus moves into the dialog when it opens, Tab is kept inside it, and
@@ -22,6 +23,7 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const { m } = useI18n();
   const titleId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -82,7 +84,12 @@ export function Modal({
                 </span>
               )}
               <h2 id={titleId}>{title}</h2>
-              <button type="button" className="icon-button ghost" onClick={onClose} aria-label="Close dialog">
+              <button
+                type="button"
+                className="icon-button ghost"
+                onClick={onClose}
+                aria-label={m.common.close}
+              >
                 <X aria-hidden size={20} />
               </button>
             </header>

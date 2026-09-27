@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useId } from 'react';
+import { useI18n } from '../../i18n/I18nProvider';
 
 export type SectionTone = 'pink' | 'violet' | 'blue' | 'teal' | 'amber';
 
@@ -27,6 +28,7 @@ export function PanelSection({
   aside?: ReactNode;
   children: ReactNode;
 }) {
+  const { rtl } = useI18n();
   const bodyId = useId();
   const open = !onToggle || !collapsed;
   const heading = (
@@ -53,7 +55,8 @@ export function PanelSection({
               <motion.span
                 className="card-chevron"
                 aria-hidden
-                animate={{ rotate: open ? 0 : -90 }}
+                // Folded, the chevron points along the reading direction.
+                animate={{ rotate: open ? 0 : rtl ? 90 : -90 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               >
                 <ChevronDown size={18} />

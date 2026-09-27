@@ -4,7 +4,8 @@ import {
   EyeOff,
   FlipHorizontal2,
   Info,
-  Keyboard,
+  Languages,
+  PanelLeftClose,
   PanelRightClose,
   PanelsTopLeft,
   Ruler,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion, type PanInfo } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadPhotoFile } from '../ai/capture';
+import { loadPhotoFile, PhotoError, type PhotoErrorKind } from '../ai/capture';
 import { useAiTryOn } from '../ai/useAiTryOn';
 import { AboutDialog } from '../components/AboutDialog';
 import { AiResultView } from '../components/AiResultView';
@@ -24,6 +25,7 @@ import { CreditsCard } from '../components/Credits';
 import { DiagnosticsPanel } from '../components/DiagnosticsPanel';
 import { FitControls } from '../components/FitControls';
 import { GarmentPicker } from '../components/GarmentPicker';
+import { LanguageToggle } from '../components/LanguageToggle';
 import { ShortcutsDialog } from '../components/ShortcutsDialog';
 import { SidebarRail } from '../components/SidebarRail';
 import { SourceControls } from '../components/SourceControls';
@@ -35,7 +37,10 @@ import { ToastViewport, useToasts } from '../components/ui/Toasts';
 import { ViewControls } from '../components/ViewControls';
 import { AI_GARMENTS, findAiGarment } from '../garments/aiCatalogue';
 import { findGarment, GARMENTS } from '../garments/catalogue';
-import { BRAND } from './brand';
+import { garmentText } from '../i18n/catalogue';
+import { Accent, withKey } from '../i18n/format';
+import { useI18n } from '../i18n/I18nProvider';
+import { LOCALES } from '../i18n/locale';
 import type { EngineSettings } from './MirrorEngine';
 import {
   liveGarmentPatch,
@@ -65,17 +70,21 @@ const SWIPE_PX = 36;
 
 type DialogId = 'about' | 'shortcuts';
 
+/** Why the AI capture failed: no video frame yet, a developer photo that cannot be used, or other. */
+type CaptureError = 'no-frame' | PhotoErrorKind | { message: string };
+
 export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appRef = useRef<HTMLDivElement>(null);
+  const { m, rtl, toggleLocale } = useI18n();
   const [prefs, setPrefs] = useState<Preferences>(loadPreferences);
   const { engine, snapshot, initError } = useMirrorEngine(canvasRef, stageRef, prefs);
   const [fullscreen, setFullscreen] = useState(false);
   const [showRig, setShowRig] = useState(false);
   const aiActive = prefs.tryOnMode === 'ai';
   const { state: ai, controller } = useAiTryOn(aiActive);
-  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<CaptureError | null>(null);
   const [dialog, setDialog] = useState<DialogId | null>(null);
   const { toasts, show: toast } = useToasts();
   const narrow = useMediaQuery(NARROW_LAYOUT_QUERY);
@@ -198,7 +207,7 @@ export function App() {
     const frame = await engine.captureSourceFrame();
     if (!frame) {
       if (wasPlaying) void engine.play();
-      setCaptureError('No video frame is available yet. Start the camera or open a video, then try again.');
+      setCaptureError('no-frame');
       return;
     }
     resumeOnRetake.current = wasPlaying;
@@ -224,7 +233,11 @@ export function App() {
         const image = await loadPhotoFile(file, ai.capabilities?.limits.maxUploadBytes ?? 8 * 1024 * 1024);
         controller.setCapture(image);
       } catch (error) {
-        setCaptureError(error instanceof Error ? error.message : String(error));
+        setCaptureError(
+          error instanceof PhotoError
+            ? error.kind
+            : { message: error instanceof Error ? error.message : String(error) },
+        );
       }
     },
     [controller, ai.capabilities],
@@ -259,14 +272,14 @@ export function App() {
         case 'm':
         case 'M':
           update({ mirror: !prefs.mirror });
-          toast(prefs.mirror ? 'Mirror off' : 'Mirror on', <FlipHorizontal2 aria-hidden size={16} />);
+          toast(prefs.mirror ? m.app.mirrorOff : m.app.mirrorOn, <FlipHorizontal2 aria-hidden size={16} />);
           break;
         case 'g':
         case 'G':
           if (aiActive) break;
           update({ showGarment: !prefs.showGarment });
           toast(
-            prefs.showGarment ? 'Shirt hidden' : 'Shirt shown',
+            prefs.showGarment ? m.app.shirtHidden : m.app.shirtShown,
             prefs.showGarment ? <EyeOff aria-hidden size={16} /> : <Eye aria-hidden size={16} />,
           );
           break;
@@ -283,10 +296,16 @@ export function App() {
         case 'S':
           setSidebarCollapsed(!prefs.sidebarCollapsed);
           toast(
-            prefs.sidebarCollapsed ? 'Sidebar unfolded' : 'Sidebar folded',
+            prefs.sidebarCollapsed ? m.app.sidebarUnfolded : m.app.sidebarFolded,
             <PanelsTopLeft aria-hidden size={16} />,
           );
           break;
+        case 'l':
+        case 'L': {
+          const next = toggleLocale();
+          toast(LOCALES[next].messages.language.switched, <Languages aria-hidden size={16} />);
+          break;
+        }
         case '?':
           setDialog('shortcuts');
           break;
@@ -294,7 +313,7 @@ export function App() {
         case '[': {
           if (aiActive) break;
           const next = selectGarmentOffset(e.key === ']' ? 1 : -1);
-          if (next) toast(next.name, <Shirt aria-hidden size={16} />);
+          if (next) toast(garmentText(m, next).name, <Shirt aria-hidden size={16} />);
           break;
         }
       }
@@ -313,6 +332,8 @@ export function App() {
     controller,
     dialog,
     toast,
+    m,
+    toggleLocale,
   ]);
 
   const hasSource = snapshot?.source.state === 'ready' || snapshot?.source.state === 'loading';
@@ -321,6 +342,16 @@ export function App() {
   const liveSource = snapshot?.source.state === 'ready' ? snapshot.source : null;
   const selectedGarment = findGarment(prefs.garmentId);
   const panelWidth = collapsed ? RAIL_WIDTH : compactSidebar ? PANEL_WIDTH.compact : PANEL_WIDTH.wide;
+  const captureErrorText =
+    captureError === null
+      ? null
+      : captureError === 'no-frame'
+        ? m.app.noFrame
+        : typeof captureError === 'string'
+          ? m.ai.photoErrors[captureError]
+          : captureError.message;
+  // The sidebar sits on the right in English and on the left in Arabic.
+  const FoldIcon = rtl ? PanelLeftClose : PanelRightClose;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -331,12 +362,12 @@ export function App() {
         data-sidebar={collapsed ? 'folded' : 'open'}
         data-layout={narrow ? 'sheet' : 'side'}
       >
-        <main className="stage" ref={stageRef} aria-label="Mirror view">
+        <main className="stage" ref={stageRef} aria-label={m.app.mirrorView}>
           <canvas ref={canvasRef} className="stage-canvas" aria-hidden />
           {initError && (
             <div className="empty-state">
               <div className="hero">
-                <h1>Cannot start</h1>
+                <h1>{m.app.cannotStart}</h1>
                 <p className="error-text">{initError}</p>
               </div>
             </div>
@@ -351,11 +382,8 @@ export function App() {
           )}
           {aiActive && controller && (hasSource || stillShown) && (
             <AiResultView
-              state={
-                captureError && !ai.capture
-                  ? { ...ai, error: { code: 'invalid-image', message: captureError } }
-                  : ai
-              }
+              state={ai}
+              captureError={ai.capture ? null : captureErrorText}
               controller={controller}
               mirror={prefs.mirror}
               canCapture={sourceReady === true && controller.canCapture()}
@@ -371,7 +399,7 @@ export function App() {
           // Remounted when the layout switches, so no inline width carries over into the bottom sheet.
           key={narrow ? 'sheet' : 'side'}
           className="panel"
-          aria-label="Controls"
+          aria-label={m.app.controls}
           initial={false}
           animate={narrow ? {} : { width: panelWidth }}
           transition={{ type: 'spring', stiffness: 300, damping: 34 }}
@@ -419,29 +447,23 @@ export function App() {
                       </span>
                       <span className="brand-text">
                         <span className="brand-name">
-                          Fitting <span className="gradient-text">Mirror</span>
+                          <Accent text={m.brand.name} />
                         </span>
                         <span className="brand-tagline">
-                          {BRAND.tagline} · by {BRAND.builder}
+                          {m.brand.tagline} · {m.brand.by(m.brand.builder)}
                         </span>
                       </span>
                     </div>
+                    {/* Three actions at most, so the brand and credit keep their room. Keyboard shortcuts
+                        are one press of ? away, and linked under the privacy note and on the rail. */}
                     <div className="panel-actions">
-                      <button
-                        type="button"
-                        className="icon-button ghost keyboard-only"
-                        onClick={() => setDialog('shortcuts')}
-                        aria-label="Keyboard shortcuts"
-                        title="Keyboard shortcuts (?)"
-                      >
-                        <Keyboard aria-hidden size={19} />
-                      </button>
+                      <LanguageToggle />
                       <button
                         type="button"
                         className="icon-button ghost"
                         onClick={() => setDialog('about')}
-                        aria-label="About this project"
-                        title="About this project"
+                        aria-label={m.common.about}
+                        title={m.common.about}
                       >
                         <Info aria-hidden size={19} />
                       </button>
@@ -449,15 +471,11 @@ export function App() {
                         type="button"
                         className="icon-button ghost"
                         onClick={() => setSidebarCollapsed(true)}
-                        aria-label={narrow ? 'Fold controls' : 'Fold sidebar'}
+                        aria-label={narrow ? m.app.foldControls : m.app.foldSidebar}
                         aria-expanded
-                        title={narrow ? 'Fold controls (S)' : 'Fold sidebar (S)'}
+                        title={withKey(narrow ? m.app.foldControls : m.app.foldSidebar, 'S')}
                       >
-                        {narrow ? (
-                          <ChevronDown aria-hidden size={20} />
-                        ) : (
-                          <PanelRightClose aria-hidden size={20} />
-                        )}
+                        {narrow ? <ChevronDown aria-hidden size={20} /> : <FoldIcon aria-hidden size={20} />}
                       </button>
                     </div>
                   </header>
@@ -469,7 +487,7 @@ export function App() {
                     </div>
                     {hasSource && (
                       <PanelSection
-                        title="Source"
+                        title={m.app.sections.source}
                         icon={<Video size={17} />}
                         tone="blue"
                         collapsed={prefs.collapsedSections.includes('source')}
@@ -477,7 +495,7 @@ export function App() {
                         aside={
                           liveSource && (
                             <span className={liveSource.kind === 'camera' ? 'chip chip-live' : 'chip'}>
-                              {liveSource.kind === 'camera' ? 'Live' : 'Video'}
+                              {liveSource.kind === 'camera' ? m.app.live : m.app.video}
                             </span>
                           )
                         }
@@ -493,7 +511,7 @@ export function App() {
                     )}
                     {aiActive && controller ? (
                       <PanelSection
-                        title="AI photo preview"
+                        title={m.app.sections.ai}
                         icon={<Sparkles size={17} />}
                         tone="teal"
                         collapsed={prefs.collapsedSections.includes('garments')}
@@ -506,16 +524,16 @@ export function App() {
                           onPhotoFile={(file) => void openPhotoFile(file)}
                           onEndSession={endSession}
                         />
-                        {captureError && (
+                        {captureErrorText && (
                           <p className="error-text" role="alert">
-                            {captureError}
+                            {captureErrorText}
                           </p>
                         )}
                       </PanelSection>
                     ) : (
                       <>
                         <PanelSection
-                          title="Shirts"
+                          title={m.app.sections.shirts}
                           icon={<Shirt size={17} />}
                           tone="pink"
                           collapsed={prefs.collapsedSections.includes('garments')}
@@ -534,12 +552,12 @@ export function App() {
                           />
                           {snapshot.garmentError && (
                             <p className="error-text" role="alert">
-                              {snapshot.garmentError}
+                              {m.garments.imageError(snapshot.garmentError)}
                             </p>
                           )}
                         </PanelSection>
                         <PanelSection
-                          title="Adjust fit"
+                          title={m.app.sections.fit}
                           icon={<Ruler size={17} />}
                           tone="amber"
                           collapsed={prefs.collapsedSections.includes('fit')}
@@ -550,7 +568,7 @@ export function App() {
                       </>
                     )}
                     <PanelSection
-                      title="View"
+                      title={m.app.sections.view}
                       icon={<Eye size={17} />}
                       tone="violet"
                       collapsed={prefs.collapsedSections.includes('view')}
@@ -611,17 +629,14 @@ export function App() {
                     <div className="privacy-note">
                       <ShieldCheck aria-hidden size={18} />
                       <p>
-                        {aiActive
-                          ? 'AI mode: a captured photo is uploaded to the cloud service FASHN only after you agree. '
-                          : 'Approximate visual preview — not a size or fit measurement, and your own clothing may show at the edges. '}
-                        2D and 3D video stays on this device; the page itself only talks to this computer, and
-                        outgoing requests (including MediaPipe usage metrics) are blocked.{' '}
+                        {aiActive ? m.app.privacyAi : m.app.privacyLive}
+                        {m.app.privacyCommon}{' '}
                         <button
                           type="button"
                           className="text-button keyboard-only"
                           onClick={() => setDialog('shortcuts')}
                         >
-                          Keyboard shortcuts
+                          {m.common.keyboardShortcuts}
                         </button>
                       </p>
                     </div>

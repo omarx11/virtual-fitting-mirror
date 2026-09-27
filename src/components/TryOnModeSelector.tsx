@@ -2,11 +2,13 @@ import { Box, Shirt, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import type { TryOnMode } from '../app/preferences';
+import { useI18n } from '../i18n/I18nProvider';
 
-const MODES: { id: TryOnMode; label: string; hint: string; icon: ReactNode }[] = [
-  { id: '2d', label: '2D', hint: 'Live · flat demo shirts', icon: <Shirt aria-hidden size={20} /> },
-  { id: '3d', label: '3D', hint: 'Live · rigged 3D shirt', icon: <Box aria-hidden size={20} /> },
-  { id: 'ai', label: 'AI', hint: 'Generated photo (cloud)', icon: <Sparkles aria-hidden size={20} /> },
+/** Mode labels stay 2D / 3D / AI in every language; the hints are translated. */
+const MODES: { id: TryOnMode; label: string; icon: ReactNode }[] = [
+  { id: '2d', label: '2D', icon: <Shirt aria-hidden size={20} /> },
+  { id: '3d', label: '3D', icon: <Box aria-hidden size={20} /> },
+  { id: 'ai', label: 'AI', icon: <Sparkles aria-hidden size={20} /> },
 ];
 
 interface PillBox {
@@ -37,10 +39,12 @@ export function TryOnModeSelector({
   disabled?: boolean;
   compact?: boolean;
 }) {
+  const { m, dir } = useI18n();
   const groupRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<PillBox | null>(null);
   const placedMode = useRef<TryOnMode | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `dir` too — switching language mirrors the buttons, so the highlight is placed again.
   useLayoutEffect(() => {
     const group = groupRef.current;
     if (!group) return;
@@ -65,14 +69,14 @@ export function TryOnModeSelector({
     const observer = new ResizeObserver(measure);
     observer.observe(group);
     return () => observer.disconnect();
-  }, [mode]);
+  }, [mode, dir]);
 
   return (
     <div
       ref={groupRef}
       className={compact ? 'mode-selector compact' : 'mode-selector'}
       role="radiogroup"
-      aria-label="Try-on mode"
+      aria-label={m.modes.label}
     >
       {pill && (
         <motion.span
@@ -83,34 +87,42 @@ export function TryOnModeSelector({
           transition={pill.instant ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
         >
           {/* One fill per mode, cross-faded, so the colour blends while the highlight slides. */}
-          {MODES.map((m) => (
-            <span key={m.id} className="mode-pill-fill" data-mode={m.id} data-active={m.id === mode} />
+          {MODES.map((option) => (
+            <span
+              key={option.id}
+              className="mode-pill-fill"
+              data-mode={option.id}
+              data-active={option.id === mode}
+            />
           ))}
         </motion.span>
       )}
-      {MODES.map((m) => (
-        // biome-ignore lint/a11y/useSemanticElements: a large touch target with radio semantics.
-        <button
-          key={m.id}
-          type="button"
-          role="radio"
-          aria-checked={mode === m.id}
-          aria-label={compact ? `${m.label} — ${m.hint}` : undefined}
-          className="mode-option"
-          data-mode={m.id}
-          disabled={disabled}
-          title={m.hint}
-          onClick={() => {
-            if (mode !== m.id) onChange(m.id);
-          }}
-        >
-          <span className="mode-content">
-            <span className="mode-icon">{m.icon}</span>
-            <span className="mode-label">{m.label}</span>
-            {!compact && <span className="mode-hint">{m.hint}</span>}
-          </span>
-        </button>
-      ))}
+      {MODES.map((option) => {
+        const hint = m.modes.hints[option.id];
+        return (
+          // biome-ignore lint/a11y/useSemanticElements: a large touch target with radio semantics.
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={mode === option.id}
+            aria-label={compact ? `${option.label} — ${hint}` : undefined}
+            className="mode-option"
+            data-mode={option.id}
+            disabled={disabled}
+            title={hint}
+            onClick={() => {
+              if (mode !== option.id) onChange(option.id);
+            }}
+          >
+            <span className="mode-content">
+              <span className="mode-icon">{option.icon}</span>
+              <span className="mode-label">{option.label}</span>
+              {!compact && <span className="mode-hint">{hint}</span>}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
