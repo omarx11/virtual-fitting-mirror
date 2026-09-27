@@ -2,7 +2,7 @@
   "name": "virtual-fitting-mirror",
   "private": true,
   "version": "0.1.0",
-  "description": "Local, free, browser-based fitting mirror prototype: MediaPipe Pose Landmarker + a rigged 3D garment (Three.js) driven by live tracking, with optional Jolt cloth motion.",
+  "description": "Browser-based fitting mirror prototype: MediaPipe Pose Landmarker + a rigged 3D garment (Three.js) driven by live tracking, legacy 2D garments, and an optional cloud AI photo try-on (FASHN) through a local Node backend.",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -10,9 +10,13 @@
   "scripts": {
     "setup:assets": "node scripts/setup-assets.mjs",
     "predev": "node scripts/setup-assets.mjs",
-    "dev": "vite",
+    "dev": "concurrently --names web,api --prefix-colors cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "tsx watch server/index.ts",
     "prebuild": "node scripts/setup-assets.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run build:server",
+    "build:server": "vite build -c vite.server.config.ts",
+    "start": "node dist-server/index.js",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "biome check .",
@@ -25,14 +29,22 @@
     "fetch:footage": "node test-footage/fetch-footage.mjs",
     "generate:3d-thumbnail": "node scripts/generate-3d-thumbnail.mjs",
     "inspect:garment": "node scripts/inspect-garment.mjs public/garments/3d/vneck/shirt-male.glb",
-    "test:e2e:preview": "npm run build && playwright test -c playwright.preview.config.ts"
+    "test:e2e:preview": "npm run build && playwright test -c playwright.preview.config.ts",
+    "generate:ai-garments": "node scripts/generate-ai-garments.mjs",
+    "smoke:ai": "tsx scripts/ai-smoke.ts"
   },
   "dependencies": {
+    "@fastify/multipart": "10.1.2",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.5",
     "@mediapipe/tasks-vision": "1.0.1",
+    "fashn": "0.15.0",
+    "fastify": "5.12.5",
     "jolt-physics": "1.1.0",
     "lucide-react": "1.48.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "sharp": "0.35.4",
     "three": "0.186.1"
   },
   "devDependencies": {
@@ -44,6 +56,8 @@
     "@types/react-dom": "19.3.0",
     "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.1",
+    "concurrently": "10.0.5",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.1",
     "vitest": "5.0.2"

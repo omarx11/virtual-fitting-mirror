@@ -7,9 +7,17 @@ tracked person's shoulders, hips, elbows and wrists. An experimental **fabric mo
 bounded cloth simulation (Jolt Physics, WASM) on top. The original flat 2D demo shirts remain as a
 legacy comparison.
 
-It runs entirely on your computer, with no account, server, paid API or model training. It is an
-approximate **visual preview**, not accurate body measurement, a sizing tool or a photorealistic
-clothing replacement: your own clothes can show at the edges — see
+A **2D / 3D / AI** selector picks the mode:
+
+- **2D** and **3D** are live tracked previews. They run entirely on your computer, with no account,
+  paid API or upload.
+- **AI** (optional) is a **generated still photo**: capture a frame, choose a garment photo, and a
+  cloud try-on model (FASHN, paid per image) generates one picture to compare with the capture. It
+  is not live. It needs the small local Node server, which holds the API key, and it uploads the
+  captured photo only after the shopper agrees.
+
+Every mode is an approximate **visual preview**, not body measurement or a sizing tool: your own
+clothes can show at the edges in 2D/3D, and AI images can alter details — see
 [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ## Requirements
@@ -18,7 +26,7 @@ clothing replacement: your own clothes can show at the edges — see
 - **Node.js 22.12+ or 24** (tested with Node 24.19.0 / npm 11.17.0)
 - A Chromium-based browser (Chrome or Edge). It was tested in Chrome 153; other browsers are
   untested.
-- Internet only for the first setup: npm packages, plus ~15 MB of model files
+- Internet for the first setup (npm packages, ~15 MB of model files), and for AI mode
 
 ## Setup (PowerShell)
 
@@ -26,23 +34,78 @@ clothing replacement: your own clothes can show at the edges — see
 cd path\to\virtual-fitting-mirror-feasibility
 npm ci                    # installs the exact versions from package-lock.json
 npm run setup:assets      # downloads + SHA-256-verifies the pose models into public\models
-npm run dev               # starts http://localhost:5173 (setup:assets also runs automatically)
+npm run dev               # web app on http://localhost:5173 + local API server on 127.0.0.1:3001
 ```
 
-Then open the printed `http://localhost:…` address in Chrome.
+Then open `http://localhost:5173` in Chrome. `npm run dev` starts two processes: Vite (the web app,
+which forwards `/api` to the backend) and the small Node backend in `server/`. 2D and 3D work even
+if the backend is not running; `npm run dev:web` starts only Vite.
 
-If port 5173 is already in use, Vite picks another port; use the address it prints. Or choose one:
-`npm run dev -- --port 5180`.
+If port 5173 is already in use, Vite picks another port; use the address it prints, and add that
+origin to `AI_ALLOWED_ORIGINS` in `.env` (e.g. `http://localhost:5180`) so the backend accepts its
+AI requests.
 
-Production build:
+Production build (one origin for the app and the API):
 
 ```powershell
-npm run build
-npm run preview           # serves dist\ at http://localhost:4173
+npm run build             # type-check, frontend (dist\) and server bundle (dist-server\)
+npm start                 # serves dist\ and /api at http://127.0.0.1:3001
 ```
+
+`npm run preview` still serves only the static `dist\` (2D/3D) at http://localhost:4173. Uploading
+`dist\` alone to a static web host cannot run AI mode: the backend must serve the same origin
+(`npm start`, or a reverse proxy that serves `dist\` and forwards `/api` to it). The backend has no
+user accounts; keep it on `127.0.0.1` unless you add authentication and HTTPS.
+
+## AI mode setup (optional, paid)
+
+1. Create a FASHN API account and buy API credits yourself (API credits are separate from FASHN's
+   consumer app credits). On 2026-09-27 the
+   [API pricing page](https://help.fashn.ai/plans-and-pricing/api-pricing) listed **$0.075 per
+   on-demand credit** (minimum purchase $7.50 for 100 credits). The default preset, Try-On Max
+   fast/1K with one output, costs **1 credit ≈ $0.075 per generated image**
+   ([Try-On Max](https://docs.fashn.ai/api-reference/tryon-max)). Check current prices first.
+2. Create the settings file **on this computer** and enter the key there:
+
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+
+   Set `FASHN_API_KEY=<your key>` and `AI_ENABLED=true`, then save. `.env` is git-ignored. Never put
+   the key in a `VITE_*` variable, a screenshot, a ticket or a chat. Only the Node server reads it.
+3. Restart `npm run dev` (or `npm start`). The server log prints `AI enabled` or why not, and the
+   AI panel shows the same reason when AI is unavailable.
+
+Spending limits (all enforced by the server; see `.env.example`):
+
+- one output per explicit **Generate**, one active job per session, `AI_MAX_CONCURRENT_JOBS=1`;
+- duplicate clicks and repeats of the same request are deduplicated; a submission is **never retried
+  automatically**, and one whose outcome is unknown (timeout) stays counted;
+- `AI_MAX_DAILY_CREDITS=20` per UTC day, recorded in `.ai-usage/ledger.json` (credit counts only,
+  no images), which survives restarts;
+- the provider is never called while `AI_ENABLED` is not true or no key is set.
+
+**Usage:** in AI mode, open **Diagnostics** (`D`) → **AI usage**: today's credits against the cap,
+the FASHN account balance (read from FASHN's free `/v1/credits` endpoint, cached for a minute), and
+a per-day history for the last 30 days (this computer only; kept 90 days in the local ledger). The
+FASHN dashboard remains the official billing record.
+
+To check the paid integration once, with ONE approved photo pair and one output:
+
+```powershell
+npm run smoke:ai -- --person path\to\approved-person.jpg --garment vneck-stone --confirm-paid-generation
+```
+
+Without `--confirm-paid-generation` it only prints what it would spend. It writes timings, image
+dimensions and reported credits to `test-results\ai-smoke\`; add `--save-result <file>` to keep
+the image for review. Optional comparison preset: `AI_EXTRA_PRESETS=v16-performance` (Try-On v1.6,
+performance mode, 1 credit), selectable in Diagnostics.
 
 ## Using it
 
+0. **Choose a mode** at the top of the panel: **2D**, **3D** (default) or **AI**. Each live mode
+   remembers its last garment.
 1. **Load a video:** click **Open a video file** and choose an MP4 (H.264) or WebM (VP8/VP9) clip of
    a person facing the camera. The file is read locally through the browser and is never uploaded.
    Portrait and landscape videos both work, and the image is never stretched.
@@ -66,6 +129,24 @@ npm run preview           # serves dist\ at http://localhost:4173
    copy time, render size, triangles, orientation/yaw, arm state, cloth solver state, cost, resets
    and developer tuning sliders.
 
+**AI mode** (see the setup above):
+
+1. Face the camera with the upper body visible and the arms slightly away from the body.
+2. **Capture photo** freezes a clean frame (never the shirt overlay). **Retake** returns to the live
+   view.
+3. Choose a garment photo in the panel.
+4. **Generate preview**. The first time in a session, a short opt-in explains that the photo goes to
+   FASHN. Nothing is uploaded before **Agree & generate**.
+5. While it runs, the stage shows what is happening (uploading, queue, generating) and the elapsed
+   time. The result is labelled **AI-generated preview**, with **Before / After / Side by side**,
+   **Retake**, **Try another garment** (reuses the same captured photo) and **End session** (deletes
+   the photo and result here and resets the opt-in for the next customer).
+6. Switching to 2D or 3D stops waiting for a result and ends the AI session.
+
+Developer test inputs (development builds): use a photo file instead of the camera, or upload a
+garment photo. The offline test provider (`AI_PROVIDER=fake`) returns a stamped TEST RESULT image,
+never an AI generation.
+
 Status messages on the video: **Tracking**, **Upper-body view** (hips out of frame),
 **Move back slightly**, **Face the mirror** (side/back view or bending), **Step into view**,
 **Tracking lost**, or a tracking error with **Retry**.
@@ -81,31 +162,45 @@ even lighting, roughly 1–3 m away. Chest-up framing is supported. The 3D shirt
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Dev server (React Strict Mode on) |
-| `npm run build` / `npm run preview` | Type-check + production build / serve the build |
-| `npm run typecheck` | `tsc -b` (strict) |
+| `npm run dev` | Web app (Vite, React Strict Mode on) + AI backend, together |
+| `npm run dev:web` / `npm run dev:api` | Only the web app / only the backend (tsx watch) |
+| `npm run build` | Type-check, frontend build (`dist\`) and server bundle (`dist-server\`) |
+| `npm start` | Production: serve `dist\` and `/api` from one origin (http://127.0.0.1:3001) |
+| `npm run preview` | Serve the static `dist\` only (2D/3D) |
+| `npm run typecheck` | `tsc -b` (strict: app, unit tests, node config and server projects) |
 | `npm run lint` / `npm run format` | Biome lint+format check / format files |
-| `npm test` | Vitest unit tests (geometry, fit, smoothing, state machine, scheduler) |
-| `npm run test:e2e` | Playwright browser tests (uses its own server on port 5174) |
-| `npm run test:e2e:preview` | Build, then run the asset-path/privacy/3D browser tests against `vite preview` (port 4174) |
+| `npm test` | Vitest: unit tests + backend tests (`tests/server`; offline, fake or mocked provider) |
+| `npm run test:e2e` | Playwright browser tests (Vite on 5174 + backend on 3101 with the fake provider) |
+| `npm run test:e2e:preview` | Build, then run the asset-path/privacy/3D/AI browser tests against the production server (port 4174) |
+| `npm run smoke:ai` | Opt-in: ONE paid FASHN generation for an approved image pair (see AI mode setup) |
+| `npm run generate:ai-garments` | Regenerate the demo AI product photos in `public/garments/ai/` |
 | `npm run inspect:garment` | Print the V-neck GLB's full node hierarchy, joints and bind positions |
 | `npm run generate:3d-thumbnail` | Render `public/garments/3d/vneck/preview.png` from the actual model |
-| `npm run check` | typecheck + lint + unit tests + build |
+| `npm run check` | typecheck + lint + unit and server tests + build (never calls a paid API) |
 | `npm run setup:assets` | Download/verify the models (`-- --check` to only verify) |
 | `npm run generate:garments` | Regenerate the demo shirt SVGs |
 | `npm run fetch:footage` | Download the openly licensed test clips (not committed) + derive crops with ffmpeg |
 
 First-time Playwright setup, only if Chromium isn't installed yet: `npx playwright install chromium`.
 
-**Privacy:** video is never uploaded, and the app blocks **all** outgoing requests, including the
-usage metrics MediaPipe would otherwise send to Google. It does this in two ways:
+**Privacy:** in 2D and 3D, video is never uploaded. The page may only contact its own origin, which
+also blocks the usage metrics MediaPipe would otherwise send to Google:
 - a local-only `fetch` guard in the page and in the tracking worker, which works on any host;
-- a `Content-Security-Policy: connect-src 'self'` rule, sent as a `<meta>` tag and as a dev/preview
-  server header.
+- a `Content-Security-Policy: connect-src 'self'` rule, sent as a `<meta>` tag and as a server
+  header (Vite dev/preview and the production server).
 
-If you host `dist\` on another web server, the fetch guard and the meta tag are already included in
-the build. For a second layer inside the worker, configure the server to also send the header
-`Content-Security-Policy: connect-src 'self' ws: wss: blob: data:`.
+**AI mode is the exception.** After the shopper agrees, the page sends one captured photo to the
+local server (same origin), and **that server** sends it with the garment image to FASHN's cloud.
+The browser never contacts FASHN and never sees the key. Locally, photos and results stay in memory
+only and are deleted on End session, after an idle timeout, or 2 minutes after a result. FASHN
+deletes its temporary input copy after processing, keeps request records without images, and keeps
+base64 results retrievable for 60 minutes
+([retention policy](https://docs.fashn.ai/api-overview/data-retention-privacy)). Ending the session
+here cannot delete provider-side data.
+
+If you host `dist\` on another web server (2D/3D only), the fetch guard and the meta tag are
+already included in the build. For a second layer inside the worker, configure the server to also
+send the header `Content-Security-Policy: connect-src 'self' ws: wss: blob: data:`.
 
 ## Troubleshooting
 
@@ -122,12 +217,18 @@ the build. For a second layer inside the worker, configure the server to also se
 | Fabric motion shows "disabled" in Diagnostics | The solver exceeded its time budget on this PC; skeletal motion continues. |
 | Slow or jerky | Open Diagnostics. If the delegate is CPU or the backend is main-thread, check that hardware acceleration is on (Chrome → Settings → System). Try Quality: Fast (Lite model). |
 | Note "Worker tracking failed … main thread" | The browser could not run the worker path; the app still works at a reduced rate. |
+| AI: "The local AI server is not running" | Start it with `npm run dev` (or `npm start` after a build) and check the `[api]` log lines. |
+| AI: "switched off" / "No FASHN API key" | Set `AI_ENABLED=true` and `FASHN_API_KEY` in `.env`, then restart the server. |
+| AI: "This request is not allowed" in development | The page's origin is not allowed; add it to `AI_ALLOWED_ORIGINS` in `.env`. |
+| AI: "daily AI preview limit" | The local cap (`AI_MAX_DAILY_CREDITS`, UTC day) is used up; it resets at 00:00 UTC. |
+| AI: "did not confirm the request" | A submission timed out. It was not resent and may still be charged; check the FASHN dashboard before trying again. |
 | `npm ci` fails on Node < 22.12 | Install Node 24 LTS from nodejs.org (or `winget install OpenJS.NodeJS.LTS`). |
 
 ## Project layout
 
 ```text
-src/app/          engine (non-React core), hooks, low-rate state, preferences
+src/app/          engine (non-React core), hooks, low-rate state, preferences (2D/3D/AI mode)
+src/ai/           AI mode: API contract types, same-origin client, capture helpers, state machine, hook
 src/components/   controls, catalogue, status, diagnostics
 src/media/        file/camera sources, frame loop (requestVideoFrameCallback)
 src/tracking/     worker protocol, MediaPipe engine, backends, scheduler
@@ -140,13 +241,16 @@ src/garments/     catalogue (2D | 3D union), image preloading, modelLoader (GLB 
                   rigModel, rigs/*.ts (per-asset rig, calibration and simulation config)
 src/physics/      cloth mode: proxy builder, Jolt world, body colliders, ClothSimulation (lazy-loaded)
 src/inspect/      development-only 3D inspection view (/?inspect=3d)
+server/           Node backend (Fastify): config, AI routes, sessions, jobs, daily credit ledger,
+                  image validation (Sharp), providers (FASHN SDK adapter, offline fake)
 src/config/       documented thresholds, quality presets, 3D render settings
-public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLB (third-party)
+public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLB (third-party);
+                  ai/<id>/ demo product photos for AI mode (assets/garments/ai/SOURCE.md)
 assets/garments/  authoring sources (FBX), SOURCE.md — never shipped by Vite
 public/models/    pose models (downloaded, not committed)
 scripts/          setup-assets.mjs, generate-garments.mjs, inspect-garment.mjs, generate-3d-thumbnail.mjs
-tests/unit, tests/e2e, tests/fixtures
-docs/             RESEARCH, IMPLEMENTATION_PLAN, TESTING, LIMITATIONS
+tests/unit, tests/server, tests/e2e, tests/fixtures
+docs/             RESEARCH, IMPLEMENTATION_PLAN, TESTING, LIMITATIONS, AI_TRYON_RESEARCH
 spike.html        standalone worker/delegate timing check (dev server: /spike.html)
 ```
 
@@ -193,7 +297,8 @@ Details and coordinate conventions: [docs/RESEARCH.md](docs/RESEARCH.md).
 ## Licences
 
 App code: yours to choose (no licence file added). Dependencies: MIT / ISC / Apache-2.0 (see
-[docs/RESEARCH.md](docs/RESEARCH.md)). The pose models are Apache-2.0 (MediaPipe model card). Demo
+[docs/RESEARCH.md](docs/RESEARCH.md)); the AI backend adds `fashn` and `sharp` (Apache-2.0) and
+Fastify packages (MIT). The pose models are Apache-2.0 (MediaPipe model card). Demo
 2D garments: CC0 (original). **The 3D V-neck is third-party content from Fab** under its own licence
 (not CC0); see [assets/garments/vneck/SOURCE.md](assets/garments/vneck/SOURCE.md) before
 redistributing or deploying it. The test footage is third-party, CC BY/BY-SA, and not committed —

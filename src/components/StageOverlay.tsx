@@ -50,7 +50,7 @@ export function StageOverlay({
           <h1>Virtual fitting mirror</h1>
           <p>
             Choose a video of a person facing the camera, or use a webcam. Video is processed on this device
-            and is never uploaded.
+            and is never uploaded; only the optional AI mode sends one captured photo, after you agree.
           </p>
           <SourceControls status={snapshot.source} onOpenFile={onOpenFile} onOpenCamera={onOpenCamera} />
           {snapshot.tracker.state === 'error' && (

@@ -3,6 +3,8 @@
  * interpretation, smoothing and rendering. High-frequency data (frames, landmarks, poses) never
  * enters React state; the UI subscribes to low-rate snapshots.
  */
+
+import { type CapturedImage, captureVideoFrame } from '../ai/capture';
 import {
   type DelegatePreference,
   MAIN_THREAD_FALLBACK_HZ,
@@ -142,7 +144,15 @@ export interface Diagnostics3D {
   cloth: ClothStats;
 }
 
+/**
+ * AI photo mode display state. 'off': live 2D/3D try-on. 'live': plain video (no garment, no
+ * overlays) with tracking kept for framing guidance. 'still': a captured/generated still covers the
+ * stage, so pose inference and garment/cloth rendering pause; the camera stream keeps running.
+ */
+export type AiView = 'off' | 'live' | 'still';
+
 export interface EngineSnapshot {
+  aiView: AiView;
   tracker: TrackerStatus;
   source: SourceStatus;
   playback: PlaybackState;
@@ -185,6 +195,7 @@ const FADE_OUT_TAU = 120;
 
 export class MirrorEngine {
   private settings: EngineSettings;
+  private aiView: AiView = 'off';
   private ctx: CanvasRenderingContext2D;
   private listeners = new Set<(s: EngineSnapshot) => void>();
   private disposed = false;
@@ -487,6 +498,7 @@ export class MirrorEngine {
     const now = performance.now();
     const video = this.source?.video;
     return {
+      aiView: this.aiView,
       tracker: this.trackerStatus,
       source: this.sourceStatus,
       playback: {
@@ -654,7 +666,7 @@ export class MirrorEngine {
       note = `${note ? `${note} ` : ''}GPU unavailable (${info.delegateFallbackReason}); using CPU.`;
     }
     this.trackerStatus = { state: 'ready', info, backend: backend.kind, note };
-    this.scheduler.setPaused(document.hidden);
+    this.scheduler.setPaused(this.inferencePaused());
     this.offerLatestFrame();
     this.emit();
   }
@@ -952,6 +964,34 @@ export class MirrorEngine {
     if (this.source && Number.isFinite(rate) && rate > 0) this.source.video.playbackRate = rate;
   }
 
+  // ---- AI photo mode ------------------------------------------------------------------------------
+
+  setAiView(view: AiView): void {
+    if (view === this.aiView) return;
+    const wasStill = this.aiView === 'still';
+    this.aiView = view;
+    if (view !== 'off') this.resetCloth('ai-mode');
+    this.scheduler?.setPaused(this.inferencePaused());
+    // Resuming live tracking after a still: start a fresh timeline (no stale pose carry-over).
+    if (wasStill) this.discontinuity();
+    this.requestRender();
+    this.emit();
+  }
+
+  /**
+   * Clean capture for AI mode: the current decoded frame of the underlying video element at its
+   * native size, unmirrored — never the stage canvas (no garment, landmarks, status or letterbox).
+   * Returns null when no frame is available or the source changed during capture.
+   */
+  async captureSourceFrame(): Promise<CapturedImage | null> {
+    const source = this.source;
+    if (!source || this.disposed) return null;
+    const token = this.sourceToken;
+    const frame = await captureVideoFrame(source.video);
+    if (!frame || token !== this.sourceToken || this.source !== source || this.disposed) return null;
+    return { ...frame, source: source.kind };
+  }
+
   // ---- Settings -----------------------------------------------------------------------------------
 
   updateSettings(patch: Partial<EngineSettings>): void {
@@ -987,6 +1027,8 @@ export class MirrorEngine {
 
   private renderNow(): void {
     if (this.disposed) return;
+    // A still image covers the stage: skip compositing, garment and cloth work entirely.
+    if (this.aiView === 'still') return;
     const now = performance.now();
     const dt = this.lastRenderAt === null ? 16 : Math.min(200, now - this.lastRenderAt);
     this.lastRenderAt = now;
@@ -1012,7 +1054,8 @@ export class MirrorEngine {
 
     // Reject stale poses: if the displayed frame is far ahead of the pose, fade out instead of
     // drawing a lagging shirt.
-    let target = this.settings.showGarment ? this.targetOpacity : 0;
+    const liveGarment = this.aiView === 'off';
+    let target = this.settings.showGarment && liveGarment ? this.targetOpacity : 0;
     const frameTime = this.latestFrame?.mediaTimeMs;
     if (this.poseFrameTimeMs !== null && frameTime !== undefined) {
       const age = frameTime - this.poseFrameTimeMs;
@@ -1033,7 +1076,7 @@ export class MirrorEngine {
         ? RENDER_3D.fallbackGarmentId
         : null
       : selected.id;
-    const garment = flatId ? this.garments.get(flatId) : null;
+    const garment = flatId && liveGarment ? this.garments.get(flatId) : null;
     const placement =
       garment && this.garmentPose
         ? computeGarmentPlacement(garment.definition, this.garmentPose, this.settings.fit)
@@ -1043,7 +1086,15 @@ export class MirrorEngine {
     let layer3d: { canvas: CanvasImageSource } | null = null;
     this.garmentShoulders = null;
     this.lastMode = 'none';
-    if (this.active3d && this.renderer3d && this.fit3d && this.opacity > 0.01 && sw > 0 && sh > 0) {
+    if (
+      liveGarment &&
+      this.active3d &&
+      this.renderer3d &&
+      this.fit3d &&
+      this.opacity > 0.01 &&
+      sw > 0 &&
+      sh > 0
+    ) {
       const size = renderSize(sw, sh, view.scale);
       const cloth =
         this.settings.motion === 'cloth' && this.cloth && this.clothFor === this.active3d.definition.id;
@@ -1066,7 +1117,7 @@ export class MirrorEngine {
       }
     }
 
-    const cutouts = this.settings.occlusion && this.currentTorso ? this.cutouts : [];
+    const cutouts = liveGarment && this.settings.occlusion && this.currentTorso ? this.cutouts : [];
     const timings = drawFrame(this.ctx, {
       view,
       source: video && sw > 0 ? video : null,
@@ -1077,14 +1128,15 @@ export class MirrorEngine {
       layer3d,
       opacity: this.opacity,
       occlusion: cutouts.length > 0 ? { cutouts } : null,
-      debug: this.settings.showLandmarks
-        ? {
-            observation: this.lastObservation,
-            torso: this.currentTorso,
-            garmentShoulders: this.garmentShoulders,
-            cutouts,
-          }
-        : null,
+      debug:
+        this.settings.showLandmarks && liveGarment
+          ? {
+              observation: this.lastObservation,
+              torso: this.currentTorso,
+              garmentShoulders: this.garmentShoulders,
+              cutouts,
+            }
+          : null,
       background: BACKGROUND,
     });
     if (layer3d) this.copyMs.push(timings.layerCopyMs);
@@ -1099,9 +1151,13 @@ export class MirrorEngine {
 
   private onVisibilityChange = () => {
     const hidden = document.hidden;
-    this.scheduler?.setPaused(hidden);
+    this.scheduler?.setPaused(this.inferencePaused());
     if (!hidden) this.discontinuity();
   };
+
+  private inferencePaused(): boolean {
+    return document.hidden || this.aiView === 'still';
+  }
 
   dispose(): void {
     if (this.disposed) return;

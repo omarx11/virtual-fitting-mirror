@@ -132,7 +132,10 @@ export function InspectView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [pose, setPose] = useState<PoseName>('neutral');
   const [helpers, setHelpers] = useState(true);
-  const [material, setMaterial] = useState(VNECK_3D.defaultMaterialId);
+  // `&material=<id>` lets the asset scripts render each fabric colour from the actual model.
+  const [material, setMaterial] = useState(
+    () => findMaterial(VNECK_3D, new URLSearchParams(location.search).get('material')).id,
+  );
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<PreparedGarmentModel['stats'] | null>(null);
   const thumbnail = new URLSearchParams(location.search).has('thumbnail');
@@ -153,7 +156,11 @@ export function InspectView() {
       .load(`${import.meta.env.BASE_URL}${VNECK_3D.model}`, VNECK_3D.rig)
       .then((model) => {
         if (cancelled) return;
-        r.setGarment(VNECK_3D, model, findMaterial(VNECK_3D, VNECK_3D.defaultMaterialId));
+        r.setGarment(
+          VNECK_3D,
+          model,
+          findMaterial(VNECK_3D, new URLSearchParams(location.search).get('material')),
+        );
         state.current = { renderer: r, model };
         setStats(model.stats);
       })

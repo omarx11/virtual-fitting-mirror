@@ -1,0 +1,51 @@
+import { useEffect, useState } from 'react';
+import { createHttpAiClient } from './client';
+import { AiTryOnController, type AiViewState, INITIAL_AI_STATE } from './controller';
+
+/** A customer's photos, results and opt-in are forgotten after this long without interaction. */
+export const AI_IDLE_RESET_MS = 3 * 60_000;
+
+/**
+ * One controller per mounted App. Safe under React Strict Mode: the development double mount
+ * creates and disposes a controller that has sent nothing (activation only reads capabilities).
+ * Leaving AI mode (`active` false) abandons pending work and purges the AI session.
+ */
+export function useAiTryOn(active: boolean): { state: AiViewState; controller: AiTryOnController | null } {
+  const [controller, setController] = useState<AiTryOnController | null>(null);
+  const [state, setState] = useState<AiViewState>(INITIAL_AI_STATE);
+
+  useEffect(() => {
+    const instance = new AiTryOnController({
+      client: createHttpAiClient(),
+      now: () => performance.now(),
+      setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimeout: (handle) => window.clearTimeout(handle as number),
+      createObjectURL: (blob) => URL.createObjectURL(blob),
+      revokeObjectURL: (url) => URL.revokeObjectURL(url),
+      randomUUID: () => crypto.randomUUID(),
+      idleResetMs: AI_IDLE_RESET_MS,
+    });
+    const unsubscribe = instance.subscribe(setState);
+    setController(instance);
+    // Exposed for automated browser tests, like window.__mirror.
+    (window as unknown as { __ai?: AiTryOnController }).__ai = instance;
+    const onPageHide = () => instance.dispose();
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      unsubscribe();
+      instance.dispose();
+      setController(null);
+      const w = window as unknown as { __ai?: AiTryOnController };
+      if (w.__ai === instance) delete w.__ai;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!controller) return;
+    if (active) void controller.activate();
+    else controller.deactivate();
+  }, [active, controller]);
+
+  return { state, controller };
+}

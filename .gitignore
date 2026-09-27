@@ -12,3 +12,10 @@ playwright-report/
 .vite/
 # Local prompt notes; not committed.
 docs/prompts.txt
+dist-server/
+# Local secrets / server settings (copy .env.example). Never committed.
+.env
+.env.*
+!.env.example
+# Durable AI usage ledger (credit counts only, no images); local to each kiosk.
+.ai-usage/

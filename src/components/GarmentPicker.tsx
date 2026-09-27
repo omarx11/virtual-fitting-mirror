@@ -4,6 +4,7 @@ import { findCard, findMaterial, GARMENT_CARDS } from '../garments/catalogue';
 import type { Garment2DDefinition, GarmentDefinition } from '../garments/types';
 
 export function GarmentPicker({
+  kind,
   garments,
   selectedId,
   onSelect,
@@ -12,6 +13,8 @@ export function GarmentPicker({
   status3d,
   onRetry3d,
 }: {
+  /** The live mode: only this kind's shirts are listed. */
+  kind: GarmentDefinition['kind'];
   garments: readonly GarmentDefinition[];
   selectedId: string;
   onSelect: (id: string) => void;
@@ -38,7 +41,7 @@ export function GarmentPicker({
     <fieldset className="garments">
       <legend className="section-title">Shirts</legend>
       <div className="garment-grid">
-        {GARMENT_CARDS.map((card) => {
+        {GARMENT_CARDS.filter((card) => card.kind === kind).map((card) => {
           const active = card.id === selectedCard.id;
           const shownId = active ? selectedId : (lastChoice.current.get(card.id) ?? card.garmentIds[0]);
           const shown = garments.find((g) => g.id === shownId);
@@ -56,9 +59,6 @@ export function GarmentPicker({
             >
               <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
               <span>{card.name}</span>
-              <span className={card.kind === '3d' ? 'badge' : 'badge badge-flat'}>
-                {card.kind === '3d' ? '3D' : '2D'}
-              </span>
             </button>
           );
         })}

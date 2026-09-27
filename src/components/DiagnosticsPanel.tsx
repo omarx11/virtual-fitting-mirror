@@ -1,3 +1,7 @@
+import { useCallback, useEffect, useState } from 'react';
+import { fetchAiUsage } from '../ai/client';
+import type { AiViewState } from '../ai/controller';
+import type { AiPresetId, AiUsageView } from '../ai/types';
 import type { EngineSnapshot } from '../app/MirrorEngine';
 import type { DelegatePreference, QualityPreset } from '../config/performance';
 import { QUALITY_PRESETS } from '../config/performance';
@@ -21,6 +25,8 @@ export function DiagnosticsPanel({
   onTuning,
   showRig,
   onToggleRig,
+  ai,
+  onAiPreset,
 }: {
   snapshot: EngineSnapshot;
   open: boolean;
@@ -37,6 +43,9 @@ export function DiagnosticsPanel({
   showRig: boolean;
   /** Development builds only. */
   onToggleRig?: () => void;
+  /** AI mode state (operator view: provider, model, preset). Null outside AI mode. */
+  ai?: AiViewState | null;
+  onAiPreset?: (id: AiPresetId) => void;
 }) {
   const d = snapshot.diagnostics;
   const t = snapshot.tracker;
@@ -285,6 +294,7 @@ export function DiagnosticsPanel({
           )}
         </>
       )}
+      {ai && ai.phase !== 'inactive' && <AiDiagnostics ai={ai} onPreset={onAiPreset} />}
       <p className="hint">
         Frame→pose: time from a video frame being presented to its pose result (capture, transfer, inference).
         Pose age: media-time gap between the displayed frame and the frame the pose came from. With landmarks
@@ -323,5 +333,127 @@ function TuningRow({
       />
       <output>{step < 1 ? value.toFixed(step < 0.01 ? 4 : 2) : value}</output>
     </label>
+  );
+}
+
+function AiDiagnostics({
+  ai,
+  onPreset,
+}: {
+  ai: AiViewState;
+  onPreset?: ((id: AiPresetId) => void) | undefined;
+}) {
+  const caps = ai.capabilities;
+  const preset = caps?.presets.find((p) => p.id === ai.preset);
+  const busy = ai.phase === 'submitting' || ai.phase === 'queued' || ai.phase === 'generating';
+  return (
+    <>
+      <h3 className="diag-subtitle">AI photo (operator)</h3>
+      <dl className="diag-grid" data-testid="diagnostics-ai">
+        <dt>State</dt>
+        <dd>{ai.phase}</dd>
+        <dt>Provider</dt>
+        <dd className={caps?.testProvider ? 'warn-text' : undefined}>
+          {caps?.provider ? (caps.testProvider ? 'fake (offline test — not AI)' : caps.provider) : '—'}
+        </dd>
+        <dt>Model / credits</dt>
+        <dd>{preset ? `${preset.model} · ${preset.credits} credit per output` : '—'}</dd>
+        <dt>Local result TTL</dt>
+        <dd>{caps ? `${caps.localResultTtlSeconds} s · job deadline ${caps.jobDeadlineSeconds} s` : '—'}</dd>
+        {ai.unavailable && (
+          <>
+            <dt>Unavailable</dt>
+            <dd className="warn-text">{ai.unavailable.reason}</dd>
+          </>
+        )}
+      </dl>
+      {caps && caps.presets.length > 1 && onPreset && (
+        <label className="inline-select">
+          <span>AI preset</span>
+          <select
+            value={ai.preset ?? ''}
+            disabled={busy}
+            onChange={(e) => onPreset(e.target.value as AiPresetId)}
+          >
+            {caps.presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <AiUsage />
+    </>
+  );
+}
+
+/** AI usage for staff: this server's local ledger plus the FASHN account balance. */
+function AiUsage() {
+  const [usage, setUsage] = useState<AiUsageView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    fetchAiUsage()
+      .then((u) => {
+        setUsage(u);
+        setError(null);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
+  useEffect(load, [load]);
+  const b = usage?.balance;
+  return (
+    <>
+      <h3 className="diag-subtitle">AI usage</h3>
+      {error && <p className="warn-text">{error}</p>}
+      {usage && (
+        <>
+          <dl className="diag-grid" data-testid="diagnostics-ai-usage">
+            <dt>Today (UTC)</dt>
+            <dd>
+              {usage.today.used} / {usage.today.cap} credits · {usage.today.remaining} left
+              {usage.today.uncertain > 0 ? ` · ${usage.today.uncertain} uncertain` : ''}
+            </dd>
+            <dt>FASHN balance</dt>
+            <dd className={b ? undefined : 'warn-text'}>
+              {b
+                ? `${b.total} credits (subscription ${b.subscription}, on-demand ${b.onDemand})`
+                : (usage.balanceError ?? '—')}
+            </dd>
+          </dl>
+          {usage.days.length > 0 && (
+            <table className="usage-table">
+              <thead>
+                <tr>
+                  <th>Day (UTC)</th>
+                  <th>Images</th>
+                  <th>Credits</th>
+                  <th>Failed</th>
+                  <th>Uncertain</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.days.map((d) => (
+                  <tr key={d.day}>
+                    <td>{d.day}</td>
+                    <td>{d.generations}</td>
+                    <td>{d.credits}</td>
+                    <td>{d.failed}</td>
+                    <td>{d.uncertain}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="hint">
+            History counts this computer only (last 30 days). The FASHN dashboard is the official billing
+            record.
+          </p>
+        </>
+      )}
+      <button type="button" className="button small" onClick={load}>
+        Refresh usage
+      </button>
+    </>
   );
 }

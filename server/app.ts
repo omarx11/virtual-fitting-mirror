@@ -1,0 +1,151 @@
+/**
+ * Fastify application: the AI API and, in production, the built frontend at the same origin.
+ * Browser → same-origin /api/ai/* → this server → the configured provider. This server is the only
+ * component allowed to reach the cloud provider; the browser stays same-origin (CSP + fetch guard).
+ */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
+import Fastify, { type FastifyError, type FastifyInstance, LogController } from 'fastify';
+import { CatalogueStore } from './ai/catalogue';
+import { AppError } from './ai/errors';
+import { JobManager } from './ai/jobs';
+import { UsageLedger } from './ai/ledger';
+import { FakeProvider } from './ai/providers/fake';
+import { FashnProvider } from './ai/providers/fashn';
+import type { TryOnProvider } from './ai/providers/types';
+import { type AiServices, aiRoutes } from './ai/routes';
+import { SessionStore } from './ai/sessions';
+import type { ServerConfig } from './config';
+
+/** Same policy as vite.config.ts / index.html: the page may only connect to its own origin. */
+export const CONTENT_SECURITY_POLICY = "connect-src 'self' ws: wss: blob: data:";
+
+export interface AppOverrides {
+  provider?: TryOnProvider;
+  ledger?: UsageLedger;
+  now?: () => number;
+  /** Sweep interval for TTLs and idle sessions (ms). */
+  sweepIntervalMs?: number;
+}
+
+export function createProvider(config: ServerConfig, now?: () => number): TryOnProvider {
+  const { ai } = config;
+  if (ai.provider === 'fake') {
+    return new FakeProvider({ scenario: ai.fakeScenario, stepMs: ai.fakeStepMs, ...(now ? { now } : {}) });
+  }
+  return new FashnProvider({ apiKey: ai.apiKey ?? '', submitTimeoutMs: ai.submitTimeoutSeconds * 1000 });
+}
+
+export interface BuiltApp {
+  app: FastifyInstance;
+  services: AiServices;
+}
+
+export async function buildApp(config: ServerConfig, overrides: AppOverrides = {}): Promise<BuiltApp> {
+  const { ai } = config;
+  const now = overrides.now ?? Date.now;
+  const app = Fastify({
+    logger:
+      config.logLevel === 'silent'
+        ? false
+        : { level: config.logLevel, redact: ['req.headers.cookie', 'req.headers.authorization'] },
+    // Request bodies are never logged; only errors are, without payloads.
+    logController: new LogController({ disableRequestLogging: true }),
+    bodyLimit: 64 * 1024,
+    trustProxy: false,
+  });
+
+  const provider = overrides.provider ?? createProvider(config, overrides.now);
+  const ledger = overrides.ledger ?? new UsageLedger(ai.ledgerPath, ai.maxDailyCredits, now);
+  const services: AiServices = {
+    config,
+    sessions: new SessionStore(ai.sessionIdleSeconds * 1000, now),
+    jobs: new JobManager({ ai, provider, ledger, now }),
+    catalogue: new CatalogueStore(config.catalogueRoot, {
+      maxBytes: ai.maxUploadBytes,
+      maxPixels: ai.maxInputPixels,
+      longSide: ai.maxUploadLongSide,
+    }),
+    ledger,
+    provider,
+    providerName: provider.name,
+  };
+
+  app.addHook('onSend', async (req, reply, payload) => {
+    reply.header('content-security-policy', CONTENT_SECURITY_POLICY);
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('referrer-policy', 'no-referrer');
+    if (req.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
+    return payload;
+  });
+
+  await app.register(rateLimit, { global: false });
+  await app.register(multipart, {
+    limits: {
+      fileSize: ai.maxUploadBytes,
+      files: 2,
+      fields: 8,
+      fieldSize: 256,
+      parts: 10,
+      headerPairs: 50,
+    },
+  });
+  // Set before registering routes: plugins inherit the error handler present at registration.
+  app.setErrorHandler((error: FastifyError | AppError, _req, reply) => {
+    if (error instanceof AppError) return reply.code(error.status).send({ error: error.toJSON() });
+    const status = (error as FastifyError).statusCode ?? 500;
+    const code = (error as FastifyError).code ?? '';
+    if (code === 'FST_REQ_FILE_TOO_LARGE' || code === 'FST_FILES_LIMIT' || status === 413) {
+      return reply
+        .code(413)
+        .send({ error: { code: 'image-too-large', message: 'That image is too large.' } });
+    }
+    if (status === 429) {
+      return reply
+        .code(429)
+        .send({ error: { code: 'rate-limited', message: 'Too many requests. Please wait a moment.' } });
+    }
+    if (status >= 400 && status < 500) {
+      return reply
+        .code(status)
+        .send({ error: { code: 'bad-request', message: 'The request was not valid.' } });
+    }
+    app.log.error({ code, name: (error as Error).name }, 'unhandled server error');
+    return reply
+      .code(500)
+      .send({ error: { code: 'internal', message: 'Something went wrong on this device.' } });
+  });
+
+  await app.register(async (scope) => aiRoutes(scope, services), { prefix: '/api/ai' });
+
+  const staticRoot =
+    config.staticRoot && existsSync(join(config.staticRoot, 'index.html')) ? config.staticRoot : null;
+  if (staticRoot) {
+    await app.register(fastifyStatic, { root: staticRoot, index: ['index.html'], wildcard: true });
+  }
+  app.setNotFoundHandler((req, reply) => {
+    // API routes must never fall through to the SPA's HTML.
+    if (req.url === '/api' || req.url.startsWith('/api/')) {
+      return reply.code(404).send({ error: { code: 'not-found', message: 'Unknown API route.' } });
+    }
+    if (staticRoot && req.method === 'GET' && (req.headers.accept ?? '').includes('text/html')) {
+      return reply.header('cache-control', 'no-cache').sendFile('index.html');
+    }
+    return reply.code(404).type('text/plain').send('Not found');
+  });
+
+  const sweeper = setInterval(() => {
+    for (const id of services.sessions.sweep()) services.jobs.purgeSession(id);
+    services.jobs.sweep();
+  }, overrides.sweepIntervalMs ?? 5000);
+  sweeper.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(sweeper);
+    services.jobs.dispose();
+  });
+
+  return { app, services };
+}

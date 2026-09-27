@@ -127,10 +127,45 @@ relaxed.
 - Camera access needs a secure context: `http://localhost` works during development; any other
   address requires HTTPS.
 
+## AI photo mode (cloud generation)
+
+- **Real FASHN generation has not been verified.** No API key was available when it was built, so only
+  the offline fake provider and a mocked FASHN transport were exercised. Latency, cost per result and
+  image quality on real kiosk photos are unknown until `npm run smoke:ai` is run with an approved
+  image pair (see [TESTING.md](TESTING.md)).
+- It is a **still photo**, not a live try-on: capture → generate (≈10 s provider time for Try-On Max
+  fast/1K, plus upload and queueing) → display. There is no continuous generation or animation.
+- Generated images can **change identity, body shape, text/logos, colour and garment details**, and
+  may handle crossed arms or loose → fitted clothing poorly. It is not a size or fit tool.
+- **Demo garment photos only.** The catalogue images are synthetic stand-ins (a texture-less 3D render
+  and flat CC0 artwork; see `assets/garments/ai/SOURCE.md`). Shop use needs real product photos.
+- Output aspect ratio may differ from the capture (v1.6 processes at 864 × 1296). Before/after are
+  shown uncropped and undistorted in the same box, so they can differ slightly in framing.
+- The full camera frame is sent (no crop step). A landscape webcam frame leaves the person small;
+  a portrait camera or a future crop step may give better results.
+- **Stopping locally is not cancelling.** Retake, switching mode or End session stop waiting and
+  delete local images, but a request already sent may still be processed and charged by FASHN.
+- The daily credit cap is local to one server's ledger file (UTC day). It does not see spending
+  from other machines or the FASHN dashboard. Unknown outcomes (timeouts) stay counted.
+- The backend binds to `127.0.0.1` and has **no user accounts**. Exposing it on a network needs
+  authentication and HTTPS first (AI refuses to run on a non-loopback address unless
+  `AI_ALLOW_NON_LOOPBACK=true`).
+- Tracking is kept running in AI mode only for framing guidance; it is not used for generation.
+
 ## Privacy and network
 
-- Video (file or camera) is processed in the browser and is **never uploaded**. No footage or
-  screenshots are saved; only UI preferences go to `localStorage`.
+- **2D and 3D:** video (file or camera) is processed in the browser and is **never uploaded**. No
+  footage or screenshots are saved; only harmless UI preferences go to `localStorage` (never photos,
+  results or AI consent).
+- **AI mode** is the exception, and only after the shopper agrees for that session: one captured
+  photo and the garment image go from the browser to the local server (same origin), which sends them
+  to FASHN. The browser itself still only talks to its own origin; the local server is the only
+  component that contacts the provider. The key never reaches the browser.
+- Locally, AI photos and results live only in memory, are deleted on End session, after an idle
+  timeout, and results after 2 minutes; they are never written to disk, logs or `localStorage`.
+  FASHN keeps request records (without images) and makes the generated image retrievable for up to
+  60 minutes; ending the session here cannot delete provider-side data. See
+  [FASHN data retention](https://docs.fashn.ai/api-overview/data-retention-privacy).
 - **MediaPipe usage metrics are blocked by default** in two layers: a local-only `fetch` guard
   (page and worker) and a `connect-src 'self'` CSP.
 - The GLB, the MediaPipe WASM and models, and the Jolt WASM are all served from the app's origin.
@@ -148,6 +183,9 @@ relaxed.
   - Cloth overload first reduces solver work, then disables the cloth layer.
 
 ## Sensible next steps
+
+0. AI mode: add a FASHN key locally, run `npm run smoke:ai` on an approved image pair, review the
+   result by eye, and replace the demo garment photos with real shop photos.
 
 1. Record the Fab creator and licence in SOURCE.md; test on the real kiosk camera, distance and
    lighting.

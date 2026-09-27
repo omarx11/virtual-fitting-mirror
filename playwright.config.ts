@@ -2,10 +2,15 @@ import { defineConfig } from '@playwright/test';
 
 /**
  * Browser tests run against the Vite dev server (React Strict Mode on, so double-mount cleanup is
- * exercised). GPU flags let headless Chromium use the real GPU via ANGLE where available; tests do
- * not assert speed.
+ * exercised) plus the local AI backend with the OFFLINE fake provider (no network, no key, no
+ * spend; its results are stamped "TEST RESULT"). GPU flags let headless Chromium use the real GPU
+ * via ANGLE where available; tests do not assert speed.
  */
 const gpuArgs = ['--enable-gpu', '--use-angle=default', '--autoplay-policy=no-user-gesture-required'];
+
+/** A dummy value: tests assert it never appears in anything the browser receives. */
+export const PLANTED_KEY = 'vfm-planted-test-key-must-never-reach-the-browser';
+const API_PORT = 3101;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -37,10 +42,32 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npx vite --port 5174 --strictPort',
-    url: 'http://localhost:5174',
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: 'npx tsx server/index.ts',
+      url: `http://127.0.0.1:${API_PORT}/api/ai/capabilities`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        AI_ENV_FILE: 'none',
+        AI_PROVIDER: 'fake',
+        AI_ENABLED: 'true',
+        FASHN_API_KEY: PLANTED_KEY,
+        AI_PORT: String(API_PORT),
+        AI_ALLOWED_ORIGINS: 'http://localhost:5174',
+        AI_LEDGER_PATH: 'memory',
+        AI_MAX_DAILY_CREDITS: '1000',
+        AI_FAKE_STEP_MS: '600',
+        AI_POLL_INTERVAL_MS: '200',
+        AI_LOG_LEVEL: 'warn',
+      },
+    },
+    {
+      command: 'npx vite --port 5174 --strictPort',
+      url: 'http://localhost:5174',
+      reuseExistingServer: true,
+      timeout: 60_000,
+      env: { AI_API_TARGET: `http://127.0.0.1:${API_PORT}` },
+    },
+  ],
 });

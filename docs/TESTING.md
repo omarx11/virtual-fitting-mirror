@@ -5,6 +5,126 @@ RX 9070 XT** (driver 32.0.31041.1004; WebGL renderer "ANGLE (AMD … Direct3D11)
 Browser: Playwright Chromium 153.0.8010.12 (headless, real GPU via ANGLE/D3D11). The user's own video
 and a physical webcam were **not available** (see "Not verified").
 
+## AI photo mode (branch `development`, 2026-09-27)
+
+Same machine and browser. Node 24.19.0. New packages (exact versions in `package-lock.json`): fashn
+0.15.0, fastify 5.12.5, @fastify/multipart 10.1.2, @fastify/rate-limit 11.2.0, @fastify/static 10.1.5,
+sharp 0.35.4 (libvips 8.18.6); dev: tsx 4.23.15, concurrently 10.0.5. `npm audit`: 0 vulnerabilities.
+
+Baseline before any change: typecheck ✅, lint ✅, 107 unit tests ✅, `npm run test:e2e` ✅ 20/20.
+
+> **What this proves and what it does not.** Everything below ran **offline**: against the fake
+> provider (stamped "TEST RESULT", no AI) or the real FASHN adapter with a **mocked transport**.
+> **No real FASHN generation was made**: no API key or approved photo pair was available, so real
+> inference, provider latency, credits charged and image quality are **not verified**. No physical
+> webcam or touchscreen was used.
+
+### Automated checks after the change
+
+| Command | Result |
+| --- | --- |
+| `npm run check` (typecheck incl. new server project + Biome + Vitest + frontend and server builds) | ✅ 151 files lint-clean; **218 tests** in 21 files (107 existing + 111 new: 88 backend, 23 browser logic) |
+| `npm run test:e2e` (Vite + backend with fake provider) | ✅ **28 passed** (20 existing + 8 new) |
+| `npm run test:e2e:preview` (production server: `dist/` + `/api` at one origin) | ✅ **10 passed** (7 existing + 3 new) |
+| `npm run smoke:ai` refusal paths (no args / fake provider / no `--confirm-paid-generation`) | ✅ refuses; nothing sent |
+| `npm run smoke:ai` with a real key | ⚪ **not run** (no key; paid) |
+
+The new AI e2e tests were also repeated 3× in a row (24/24) after fixing a race (below).
+
+### What the new tests cover
+
+- **Provider request schemas** (`tests/server/presets.test.ts`): Try-On Max sends exactly
+  `model_image, product_image, generation_mode: 'fast', resolution: '1k', num_images: 1,
+  output_format: 'jpeg', return_base64: true, seed`; v1.6 sends `garment_image, category,
+  garment_photo_type` (from product metadata), `mode: 'performance', num_samples: 1`. Neither sends the
+  other model's parameter names or a prompt.
+- **Real FASHN adapter over a mocked `fetch`** (`fashn.test.ts`): one `POST https://api.fashn.ai/v1/run`
+  with `Authorization: Bearer` and the exact body; **no retry** after a connection failure, timeout,
+  500 or 503 (reported as *ambiguous*); 401 / 429 OutOfCredits / 429 rate or concurrency / 400
+  mapped to definite rejections with sanitized messages; `GET /v1/status/{id}` shape validation and
+  the `x-fashn-credits-used` header; nothing (key or image data) logged even with `FASHN_LOG=debug`.
+- **Images** (`images.test.ts`): magic-byte type detection (JPEG/PNG/WebP only); SVG, text, empty,
+  truncated, animated WebP, tiny and 20:1 images rejected; byte and decoded-pixel limits (a 4000×4000
+  PNG under 200 KB is refused); EXIF orientation applied and all metadata (EXIF/ICC/XMP) removed;
+  aspect ratio kept, downscale only. Provider output: only a base64 raster data URI is accepted;
+  URLs (never fetched), HTML, SVG, bad base64, type mismatch, oversize and the `_expired` marker are
+  refused.
+- **Jobs and spending** (`jobs.test.ts`, `ledger.test.ts`): 5 simultaneous duplicates → one
+  provider submission; reuse of a request ID with other inputs refused; one active job per session;
+  global concurrency (abandoned in-flight jobs still count); daily cap; an ambiguous submission is
+  never retried and stays reserved; a definite rejection and documented provider failures release the
+  credit; completed/bad-output are charged; deadline → *uncertain*; transient status errors recover
+  without resubmitting; the ledger survives a restart (a crashed in-flight reservation still counts),
+  uses the UTC day, and fails closed when corrupt.
+- **HTTP API** (`app.test.ts`, `config.test.ts`): unconfigured AI reports its reason and never calls
+  the provider; the key never appears in responses; missing marker header, foreign Origin, cross-site
+  Sec-Fetch-Site and unknown Host (DNS rebinding) → 403, no CORS headers; POST without Origin → 403;
+  HttpOnly SameSite=Strict path-scoped cookie; consent version, request UUID, garment allowlist (incl.
+  `../../package.json`), preset, uploads switch and image validation checked before any submission;
+  streaming upload limit → 413; three concurrent identical HTTP posts → one job; cross-session read,
+  download and delete → 404; End session and idle expiry purge results; abandoned jobs never expose a
+  late result; unknown `/api` routes are JSON 404s; production serves `dist/`, SPA fallback and the
+  API at one origin with the CSP header; safe configuration defaults and invalid settings rejected.
+- **Browser state machine** (`aiController.test.ts`): activation, capture and garment choice send
+  nothing; consent is asked before the first upload and declining sends nothing; repeated clicks →
+  one submission; queued → generating → result; "Try another garment" reuses the original capture,
+  never the generated image; retake, garment change, leaving AI mode and unmount discard late results;
+  End session revokes object URLs and requires a new opt-in; polling interruptions show a notice and
+  never resubmit; after a lost submission, the explicit retry reuses the same request ID (server
+  dedupes); the local deadline gives up without resubmitting.
+- **Preferences** (`tryOnMode.test.ts`): 3D stays the default; old stored preferences migrate
+  (mode follows the stored garment); each live mode remembers its garment across 2D → AI → 3D → 2D;
+  inconsistent data is repaired; no photo/consent/session data is stored. AI catalogue entries have
+  unique product photos, category, photo type, provenance and valid live links.
+- **Browser (`tests/e2e/ai.spec.ts`)**:
+  - the 2D / 3D / AI selector and per-mode garment memory; live modes make **no** `/api` request;
+    entering AI only reads capabilities;
+  - **clean capture**: the captured frame equals the video element's own pixels (native 320×240, not
+    the stage canvas size), is identical with mirror on and off, and on real footage matches the raw
+    video while the stage canvas (with the 3D shirt drawn) clearly differs;
+  - full flow with the fake provider: capture pauses the file video and the engine stops inference
+    (`aiView: 'still'`); consent dialog (declining sends nothing); progress labels + elapsed time;
+    labelled result with TEST RESULT badge, mirrored consistently; Before / After / Side by side;
+    try another garment on the same photo; a double click creates one job; End session resumes the
+    video, deletes the session and asks the next customer again; only same-origin requests;
+  - switching to 3D mid-generation ends the AI session; after the fake provider finishes, returning to
+    AI shows nothing stale and no result is downloaded;
+  - a developer photo can replace the camera; backend down (502) and unconfigured states explain the
+    setup while 3D keeps working;
+  - **production** (also in the preview run): a planted dummy key never appears in any HTML/JS/JSON
+    the browser receives; results are `image/jpeg` with `Cache-Control: no-store`; unknown `/api`
+    routes return JSON 404.
+- The frontend bundle contains no server code: no `api.fashn.ai`, `x-fashn-credits-used`,
+  `predictions.run`, Fastify or Sharp code (checked with grep on `dist/`; `FASHN_API_KEY` appears
+  only as the variable name in the staff setup text).
+
+### Issues found and fixed during testing
+
+- The Fastify error handler was registered after the API plugin, so API errors used Fastify's default
+  body shape. Found by `app.test.ts`; the handler is now registered first.
+- Leaving AI mode could send a job DELETE that raced the session purge (harmless 401). Ending a session
+  now relies on the purge, and in-flight status reads are aborted.
+- Split-view layout on a portrait kiosk; fixed after screenshot review.
+
+### Visual review (fake provider only)
+
+Screenshots of every AI state at 1280×800 and 1080×1920 (live guidance, review, consent, progress,
+result, side by side) were checked by eye. The fake result is the capture with a red TEST RESULT
+banner, so this says nothing about generated image quality. With mirror on, the whole result image
+is mirrored like the capture, including the banner text (the unmirrored label keeps it readable).
+
+### Not verified: steps to finish AI validation
+
+1. Buy API credits, put the key in `.env` on the kiosk PC (`FASHN_API_KEY`, `AI_ENABLED=true`).
+2. Get consent from a tester and choose one photo of them plus one real product photo.
+3. Run `npm run smoke:ai -- --person <photo> --garment <catalogue id or product photo>
+   --confirm-paid-generation --save-result test-results\ai-smoke\result.jpg` and record the preset,
+   dimensions, timings and credits from the JSON report here.
+4. Review the image for face/identity, garment colour, text/logos, seams, sleeves, crossed arms,
+   background, body shape, and loose/long → fitted/short clothing.
+5. Try the full flow on the kiosk with the physical webcam and touchscreen, then several garment types
+   with real shop photos.
+
 ## Live 3D garments (branch `dev/live-3d-garments`, 2026-09-26)
 
 Same machine and browser as below. Baseline before any change: `npm run check` ✅ (63 unit

@@ -7,6 +7,9 @@ public domain under **CC0-1.0** (https://creativecommons.org/publicdomain/zero/1
 **Exception: `3d/` is NOT covered by this licence.** It holds a third-party 3D model (and a
 thumbnail rendered from it) under its own licence; see `assets/garments/vneck/SOURCE.md`.
 
+`ai/` holds demo product photos for AI mode: the four 2D tees rasterized from this CC0 art (CC0), and
+two renders of the third-party V-neck (its own licence). See `assets/garments/ai/SOURCE.md`.
+
 | Garment | Folder | Parts |
 | --- | --- | --- |
 | Coral crew tee | `coral-crew-tee/` | body, left/right sleeve, preview |

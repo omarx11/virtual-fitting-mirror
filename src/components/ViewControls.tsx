@@ -41,6 +41,7 @@ export function ViewControls({
   onToggleFabricMotion,
   onToggleFullscreen,
   onToggleFitMode,
+  garmentToggles = true,
 }: {
   showGarment: boolean;
   mirror: boolean;
@@ -55,18 +56,22 @@ export function ViewControls({
   onToggleFabricMotion: () => void;
   onToggleFullscreen: () => void;
   onToggleFitMode: () => void;
+  /** False in AI mode, where no live garment is drawn. */
+  garmentToggles?: boolean;
 }) {
   return (
     <fieldset className="view-controls">
       <legend className="section-title">View</legend>
       <div className="toggle-grid">
-        <Toggle
-          pressed={showGarment}
-          onToggle={onToggleGarment}
-          icon={<Shirt aria-hidden size={18} />}
-          label="Shirt"
-          shortcut="G"
-        />
+        {garmentToggles && (
+          <Toggle
+            pressed={showGarment}
+            onToggle={onToggleGarment}
+            icon={<Shirt aria-hidden size={18} />}
+            label="Shirt"
+            shortcut="G"
+          />
+        )}
         <Toggle
           pressed={mirror}
           onToggle={onToggleMirror}
@@ -74,13 +79,15 @@ export function ViewControls({
           label="Mirror"
           shortcut="M"
         />
-        <Toggle
-          pressed={occlusion}
-          onToggle={onToggleOcclusion}
-          icon={<Hand aria-hidden size={18} />}
-          label="Arms in front (beta)"
-        />
-        {fabricMotion !== null && (
+        {garmentToggles && (
+          <Toggle
+            pressed={occlusion}
+            onToggle={onToggleOcclusion}
+            icon={<Hand aria-hidden size={18} />}
+            label="Arms in front (beta)"
+          />
+        )}
+        {garmentToggles && fabricMotion !== null && (
           <Toggle
             pressed={fabricMotion}
             onToggle={onToggleFabricMotion}
