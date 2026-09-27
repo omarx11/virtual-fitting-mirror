@@ -8,11 +8,14 @@ import { join } from 'node:path';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import { Redis } from '@upstash/redis';
 import Fastify, { type FastifyError, type FastifyInstance, LogController } from 'fastify';
+import { AccessGate } from './ai/access';
 import { CatalogueStore } from './ai/catalogue';
 import { AppError } from './ai/errors';
 import { JobManager } from './ai/jobs';
-import { UsageLedger } from './ai/ledger';
+import { type KvStore, MemoryKv, RedisKv } from './ai/kv';
+import { FileLedger, KvLedger, type UsageLedger } from './ai/ledger';
 import { FakeProvider } from './ai/providers/fake';
 import { FashnProvider } from './ai/providers/fashn';
 import type { TryOnProvider } from './ai/providers/types';
@@ -26,9 +29,31 @@ export const CONTENT_SECURITY_POLICY = "connect-src 'self' ws: wss: blob: data:"
 export interface AppOverrides {
   provider?: TryOnProvider;
   ledger?: UsageLedger;
+  /** Shared state store (tests pass one to simulate several instances sharing Redis). */
+  kv?: KvStore;
   now?: () => number;
-  /** Sweep interval for TTLs and idle sessions (ms). */
+  /** How often expired in-memory entries are freed (ms). */
   sweepIntervalMs?: number;
+  /** Keeps background job work alive after a response (Vercel: waitUntil). */
+  defer?: (work: Promise<unknown>) => void;
+}
+
+/** The configured store: this process's memory, or the shared Upstash Redis database. */
+export function createKv(config: ServerConfig, now?: () => number): KvStore {
+  const { redis } = config.ai;
+  if (config.ai.store === 'redis' && redis) {
+    const client = new Redis({
+      url: redis.url,
+      token: redis.token,
+      // Values are strings we encode ourselves (JSON, base64); nothing is converted implicitly.
+      automaticDeserialization: false,
+      // Commands issued together (Promise.all) travel in one HTTP request.
+      enableAutoPipelining: true,
+    });
+    return new RedisKv(client);
+  }
+  // Without Redis credentials AI reports itself unavailable; a local store keeps the app running.
+  return new MemoryKv(now);
 }
 
 export function createProvider(config: ServerConfig, now?: () => number): TryOnProvider {
@@ -59,11 +84,24 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
   });
 
   const provider = overrides.provider ?? createProvider(config, overrides.now);
-  const ledger = overrides.ledger ?? new UsageLedger(ai.ledgerPath, ai.maxDailyCredits, now);
+  const kv = overrides.kv ?? createKv(config, now);
+  const ledger =
+    overrides.ledger ??
+    (kv.kind === 'redis'
+      ? new KvLedger(kv, ai.maxDailyCredits, now)
+      : new FileLedger(ai.ledgerPath, ai.maxDailyCredits, now));
   const services: AiServices = {
     config,
-    sessions: new SessionStore(ai.sessionIdleSeconds * 1000, now),
-    jobs: new JobManager({ ai, provider, ledger, now }),
+    sessions: new SessionStore(kv, ai.sessionIdleSeconds * 1000, now),
+    jobs: new JobManager({
+      ai,
+      provider,
+      ledger,
+      kv,
+      now,
+      ...(overrides.defer ? { defer: overrides.defer } : {}),
+    }),
+    access: new AccessGate(ai.accessCode, kv, ai.accessLifetimeHours * 3_600_000, now),
     catalogue: new CatalogueStore(config.catalogueRoot, {
       maxBytes: ai.maxUploadBytes,
       maxPixels: ai.maxInputPixels,
@@ -137,13 +175,12 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
     return reply.code(404).type('text/plain').send('Not found');
   });
 
-  const sweeper = setInterval(() => {
-    for (const id of services.sessions.sweep()) services.jobs.purgeSession(id);
-    services.jobs.sweep();
-  }, overrides.sweepIntervalMs ?? 5000);
-  sweeper.unref();
+  // Everything expires by time to live; a memory store only needs expired entries freed now and then.
+  const sweeper =
+    kv instanceof MemoryKv ? setInterval(() => kv.sweep(), overrides.sweepIntervalMs ?? 5000) : null;
+  sweeper?.unref();
   app.addHook('onClose', async () => {
-    clearInterval(sweeper);
+    if (sweeper) clearInterval(sweeper);
     services.jobs.dispose();
   });
 

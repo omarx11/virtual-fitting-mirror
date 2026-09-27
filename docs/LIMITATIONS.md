@@ -146,11 +146,18 @@ relaxed.
   a portrait camera or a future crop step may give better results.
 - **Stopping locally is not cancelling.** Retake, switching mode or End session stop waiting and
   delete local images, but a request already sent may still be processed and charged by FASHN.
-- The daily credit cap is local to one server's ledger file (UTC day). It does not see spending
-  from other machines or the FASHN dashboard. Unknown outcomes (timeouts) stay counted.
-- The backend binds to `127.0.0.1` and has **no user accounts**. Exposing it on a network needs
-  authentication and HTTPS first (AI refuses to run on a non-loopback address unless
-  `AI_ALLOW_NON_LOOPBACK=true`).
+- The daily credit cap covers one deployment's ledger (UTC day): the kiosk's ledger file, or on
+  Vercel the shared Redis database (all instances, production and previews using that database). It
+  does not see spending from other deployments or the FASHN dashboard. Unknown outcomes (timeouts)
+  stay counted.
+- The kiosk backend binds to `127.0.0.1` and has **no user accounts** (AI refuses to run on a
+  non-loopback address unless `AI_ALLOW_NON_LOOPBACK=true`). The public Vercel deployment protects
+  paid generations with one shared **access code** instead: anyone who has the code can generate
+  (up to the daily cap), and it cannot tell people apart. Change `AI_ACCESS_CODE` to sign everyone
+  out.
+- On Vercel a job whose submitting function instance stops is finished by the next status read;
+  if the instance stopped while submitting, the outcome is unknown and the credit stays counted
+  ('uncertain'), exactly like a timeout.
 - Tracking is kept running in AI mode only for framing guidance; it is not used for generation.
 
 ## Privacy and network
@@ -159,11 +166,14 @@ relaxed.
   footage or screenshots are saved; only harmless UI preferences go to `localStorage` (never photos,
   results or AI consent).
 - **AI mode** is the exception, and only after the shopper agrees for that session: one captured
-  photo and the garment image go from the browser to the local server (same origin), which sends them
-  to FASHN. The browser itself still only talks to its own origin; the local server is the only
-  component that contacts the provider. The key never reaches the browser.
-- Locally, AI photos and results live only in memory, are deleted on End session, after an idle
-  timeout, and results after 2 minutes; they are never written to disk, logs or `localStorage`.
+  photo and the garment image go from the browser to the AI server (same origin: the kiosk's local
+  server or the Vercel Function), which sends them to FASHN. The browser itself still only talks to
+  its own origin; the AI server is the only component that contacts the provider. The key never
+  reaches the browser.
+- The server never stores the photo (it exists only in memory until it is sent). The generated
+  image is kept until End session, the idle timeout, or 2 minutes after the result, whichever comes
+  first: in memory on the kiosk, in the Upstash Redis database (Frankfurt) on Vercel. Neither is
+  written to disk, logs or `localStorage`.
   FASHN keeps request records (without images) and makes the generated image retrievable for up to
   60 minutes; ending the session here cannot delete provider-side data. See
   [FASHN data retention](https://docs.fashn.ai/api-overview/data-retention-privacy).

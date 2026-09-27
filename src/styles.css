@@ -2165,6 +2165,47 @@ kbd {
   gap: 10px;
 }
 
+.ai-access {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.ai-access .field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-access .hint {
+  margin: 0 0 8px;
+}
+
+.ai-access-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-access-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.ai-access-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+}
+
 .ai-unavailable {
   padding: 10px 12px;
   border-radius: 12px;

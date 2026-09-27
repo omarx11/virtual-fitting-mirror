@@ -389,8 +389,8 @@ function AiDiagnostics({
           </select>
         </label>
       )}
-      {/* Usage lives on the local AI server: nothing to ask while it is not running. */}
-      {!ai.unavailable?.backendDown && <AiUsage />}
+      {/* Usage lives on the local AI server: nothing to ask while it is not running (or not deployed). */}
+      {(!ai.unavailable || ai.unavailable.cause === 'disabled') && <AiUsage />}
     </>
   );
 }

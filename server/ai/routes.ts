@@ -2,10 +2,13 @@
  * /api/ai/* — the application-owned API the browser talks to (same origin only).
  *
  * Request protection (every route):
- *   - Host must be one of the configured origins' hosts (defeats DNS rebinding);
+ *   - Host must be one of the configured origins' hosts (defeats DNS rebinding); on Vercel, where
+ *     only the project's own domains reach the function, the Origin must equal https://<Host>;
  *   - Sec-Fetch-Site, when sent, must be same-origin; state-changing requests need an allowed Origin;
  *   - every call carries the X-VFM-AI header, which a cross-site form or <img> cannot add, and no
  *     CORS headers are ever sent, so other sites cannot read or write this API;
+ *   - when an access code is configured (always on Vercel), starting a session, a job or reading
+ *     usage needs the signed access cookie (see access.ts);
  *   - jobs belong to an ephemeral session (HttpOnly SameSite=Strict cookie) and are checked on
  *     every read, result download and deletion. Job IDs alone are not permission, and provider
  *     prediction IDs are never accepted from or shown to the client.
@@ -25,6 +28,7 @@ import {
   type AiUsageView,
 } from '../../src/ai/types';
 import type { ServerConfig } from '../config';
+import { type AccessGate, accessCookie } from './access';
 import type { CatalogueStore } from './catalogue';
 import { AppError } from './errors';
 import { type ImageLimits, type NormalizedImage, normalizeImage } from './images';
@@ -47,6 +51,7 @@ export interface AiServices {
   jobs: JobManager;
   catalogue: CatalogueStore;
   ledger: UsageLedger;
+  access: AccessGate;
   provider: TryOnProvider;
   providerName: 'fashn' | 'fake';
 }
@@ -60,7 +65,7 @@ export function unavailableReason(s: AiServices): string | null {
   return s.config.ai.unavailableReason ?? s.ledger.loadError;
 }
 
-export function capabilities(s: AiServices): AiCapabilities {
+export function capabilities(s: AiServices, cookieHeader?: string): AiCapabilities {
   const { ai } = s.config;
   const reason = unavailableReason(s);
   return {
@@ -72,6 +77,7 @@ export function capabilities(s: AiServices): AiCapabilities {
     defaultPreset: reason === null ? ai.defaultPreset : null,
     consentVersion: AI_CONSENT_VERSION,
     devUploads: ai.devUploads,
+    access: { required: s.access.required, granted: s.access.granted(cookieHeader) },
     limits: { maxUploadBytes: ai.maxUploadBytes, maxInputPixels: ai.maxInputPixels },
     localResultTtlSeconds: ai.resultTtlSeconds,
     jobDeadlineSeconds: ai.jobDeadlineSeconds,
@@ -85,16 +91,19 @@ export function checkRequestOrigin(
   req: Pick<FastifyRequest, 'headers' | 'method'>,
   allowedOrigins: ReadonlySet<string>,
   allowedHosts: ReadonlySet<string>,
+  sameOriginHosts = false,
 ): void {
   const host = req.headers.host?.toLowerCase();
-  if (!host || !allowedHosts.has(host)) throw forbidden();
+  if (!host) throw forbidden();
+  const origins = sameOriginHosts ? new Set([`https://${host}`]) : allowedOrigins;
+  if (!sameOriginHosts && !allowedHosts.has(host)) throw forbidden();
   const site = req.headers['sec-fetch-site'];
   if (site !== undefined && site !== 'same-origin') throw forbidden();
   if (req.headers[AI_CLIENT_HEADER] !== '1') throw forbidden();
   const origin = req.headers.origin;
   const safe = req.method === 'GET' || req.method === 'HEAD';
-  if (!safe && (!origin || !allowedOrigins.has(origin))) throw forbidden();
-  if (safe && origin !== undefined && !allowedOrigins.has(origin)) throw forbidden();
+  if (!safe && (!origin || !origins.has(origin))) throw forbidden();
+  if (safe && origin !== undefined && !origins.has(origin)) throw forbidden();
 }
 
 export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<void> {
@@ -106,14 +115,15 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     maxPixels: ai.maxInputPixels,
     longSide: ai.maxUploadLongSide,
   };
+  const secure = (req: FastifyRequest) => s.config.secureCookies || req.protocol === 'https';
 
   app.addHook('onRequest', async (req, reply) => {
     reply.header('cache-control', 'no-store');
-    checkRequestOrigin(req, origins, hosts);
+    checkRequestOrigin(req, origins, hosts, s.config.sameOriginHosts);
   });
 
-  const requireSession = (req: FastifyRequest): Session => {
-    const session = s.sessions.touch(readCookie(req.headers.cookie, SESSION_COOKIE));
+  const requireSession = async (req: FastifyRequest): Promise<Session> => {
+    const session = await s.sessions.touch(readCookie(req.headers.cookie, SESSION_COOKIE));
     if (!session) throw new AppError('session-expired', 401, 'Your AI session ended. Please start again.');
     return session;
   };
@@ -122,9 +132,9 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     if (!JOB_ID.test(id)) throw new AppError('not-found', 404, 'That preview no longer exists.');
     return id;
   };
-  const endSession = (req: FastifyRequest) => {
+  const endSession = async (req: FastifyRequest) => {
     const previous = readCookie(req.headers.cookie, SESSION_COOKIE);
-    if (previous && s.sessions.delete(previous)) s.jobs.purgeSession(previous);
+    if (previous && (await s.sessions.delete(previous))) await s.jobs.purgeSession(previous);
   };
   const sessionView = (session: Session): AiSessionView => ({
     expiresAt: s.sessions.expiresAt(session),
@@ -133,20 +143,24 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
 
   const lenient = { config: { rateLimit: { max: 240, timeWindow: '1 minute' } } };
 
-  app.get('/capabilities', lenient, async () => capabilities(s));
+  app.get('/capabilities', lenient, async (req) => capabilities(s, req.headers.cookie));
 
-  // Staff usage view: local ledger (this server only) + FASHN account balance (cached 60 s).
+  // Unlocks paid generations for this browser (public deployments).
+  app.post('/access', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const code = (req.body as { code?: unknown } | null)?.code;
+    const grant = await s.access.unlock(code, req.ip);
+    reply.header('set-cookie', accessCookie(grant.value, grant.maxAgeSeconds, secure(req)));
+    return reply.code(204).send();
+  });
+
+  // Staff usage view: the credit ledger + FASHN account balance (cached 60 s per instance).
   let balanceCache: { at: number; balance: ProviderBalance | null; error: string | null } | null = null;
-  app.get('/usage', lenient, async (): Promise<AiUsageView> => {
-    const { ledger } = s;
+  app.get('/usage', lenient, async (req): Promise<AiUsageView> => {
+    s.access.require(req.headers.cookie);
+    const [today, days] = await Promise.all([s.ledger.today(), s.ledger.summary(30)]);
     const view: AiUsageView = {
-      today: {
-        used: ledger.usedToday(),
-        cap: ledger.cap,
-        remaining: ledger.remainingToday(),
-        uncertain: ledger.uncertainToday(),
-      },
-      days: ledger.summary(30),
+      today: { ...today, cap: s.ledger.cap },
+      days,
       balance: null,
       balanceError: null,
       balanceCheckedAt: null,
@@ -182,15 +196,16 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
 
   // A new session always replaces (and purges) the caller's previous one: a new customer.
   app.post('/session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
-    endSession(req);
-    const session = s.sessions.create();
-    reply.header('set-cookie', sessionCookie(session.id, req.protocol === 'https'));
+    s.access.require(req.headers.cookie);
+    await endSession(req);
+    const session = await s.sessions.create();
+    reply.header('set-cookie', sessionCookie(session.id, secure(req)));
     return sessionView(session);
   });
 
   app.delete('/session', lenient, async (req, reply) => {
-    endSession(req);
-    reply.header('set-cookie', clearedSessionCookie(req.protocol === 'https'));
+    await endSession(req);
+    reply.header('set-cookie', clearedSessionCookie(secure(req)));
     return reply.code(204).send();
   });
 
@@ -199,7 +214,8 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (req: FastifyRequest, reply: FastifyReply) => {
       if (unavailableReason(s)) throw new AppError('not-configured', 503, 'AI preview is not available.');
-      const session = requireSession(req);
+      s.access.require(req.headers.cookie);
+      const session = await requireSession(req);
       if (!req.isMultipart()) throw new AppError('bad-request', 415, 'Expected a multipart upload.');
 
       const fields: Record<string, string> = {};
@@ -237,13 +253,13 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
       if ((garmentId === null) === (upload === null)) {
         throw new AppError('bad-request', 400, 'Choose exactly one garment.');
       }
-      let product: NormalizedImage;
+      let productPending: Promise<NormalizedImage>;
       let category: AiGarmentCategory;
       let photoType: AiGarmentPhotoType;
       let garmentKey: string;
       if (garmentId !== null) {
         const garment = s.catalogue.garment(garmentId);
-        product = await s.catalogue.productImage(garment.id);
+        productPending = s.catalogue.productImage(garment.id);
         category = garment.category;
         photoType = garment.photoType;
         garmentKey = `catalogue:${garment.id}`;
@@ -254,18 +270,22 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
         if (!CATEGORIES.includes(category) || !PHOTO_TYPES.includes(photoType)) {
           throw new AppError('bad-request', 400, 'Invalid garment category or photo type.');
         }
-        product = await normalizeImage(upload as Buffer, limits);
-        garmentKey = `upload:${createHash('sha256').update(product.buffer).digest('hex')}`;
+        productPending = normalizeImage(upload as Buffer, limits);
+        garmentKey = '';
       }
-      const personImage = await normalizeImage(person, limits);
+      // Both images are decoded in parallel (Sharp runs off the main thread).
+      const [personImage, product] = await Promise.all([normalizeImage(person, limits), productPending]);
+      if (garmentId === null)
+        garmentKey = `upload:${createHash('sha256').update(product.buffer).digest('hex')}`;
       const fingerprint = createHash('sha256')
         .update(`${preset}\n${garmentKey}\n${category}\n${photoType}\n`)
         .update(personImage.buffer)
         .digest('hex');
 
       // The session may have ended while the upload was processed.
-      if (!s.sessions.has(session.id)) throw new AppError('session-expired', 401, 'Your AI session ended.');
-      const { job } = s.jobs.create({
+      if (!(await s.sessions.has(session.id)))
+        throw new AppError('session-expired', 401, 'Your AI session ended.');
+      const { job } = await s.jobs.create({
         sessionId: session.id,
         clientRequestId,
         fingerprint,
@@ -280,10 +300,10 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     },
   );
 
-  app.get('/jobs/:id', lenient, async (req) => s.jobs.view(jobId(req), requireSession(req).id));
+  app.get('/jobs/:id', lenient, async (req) => s.jobs.view(jobId(req), (await requireSession(req)).id));
 
   app.get('/jobs/:id/result', lenient, async (req, reply) => {
-    const image = s.jobs.result(jobId(req), requireSession(req).id);
+    const image = await s.jobs.result(jobId(req), (await requireSession(req)).id);
     return reply
       .type(image.contentType)
       .header('content-disposition', 'inline')
@@ -293,7 +313,7 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
 
   // Local abandonment only: the provider may still finish and charge the prediction.
   app.delete('/jobs/:id', lenient, async (req, reply) => {
-    s.jobs.abandon(jobId(req), requireSession(req).id);
+    await s.jobs.abandon(jobId(req), (await requireSession(req)).id);
     return reply.code(204).send();
   });
 }

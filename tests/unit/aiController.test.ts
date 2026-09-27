@@ -24,6 +24,7 @@ const CAPS: AiCapabilities = {
   localResultTtlSeconds: 120,
   jobDeadlineSeconds: 120,
   providerRetentionUrl: 'https://docs.fashn.ai/api-overview/data-retention-privacy',
+  access: { required: false, granted: true },
 };
 
 type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void };
@@ -62,6 +63,13 @@ class FakeClient implements AiClient {
     this.calls.push('capabilities');
     if (this.caps instanceof Error) throw this.caps;
     return this.caps;
+  }
+  unlockCodes: string[] = [];
+  async unlock(code: string) {
+    this.calls.push('unlock');
+    this.unlockCodes.push(code);
+    if (code !== 'right-code-1')
+      throw new AiApiError('access-denied', 403, 'That access code is not correct.');
   }
   async createSession() {
     this.calls.push('session');
@@ -197,10 +205,69 @@ describe('AI controller: nothing is sent without an explicit Generate + opt-in',
     const down = setup();
     down.client.caps = new AiApiError('network', 0, 'unreachable');
     await down.controller.activate();
-    expect(down.controller.getState().unavailable).toMatchObject({ backendDown: true });
+    expect(down.controller.getState().unavailable).toMatchObject({ cause: 'backend-down' });
     down.controller.setCapture(photo());
     down.controller.requestGenerate();
     expect(down.client.calls).toEqual(['capabilities']);
+  });
+});
+
+describe('AI controller: access code on a public deployment', () => {
+  it('blocks Generate until the code is accepted, and relocks when the server asks again', async () => {
+    const t = setup();
+    t.client.caps = { ...CAPS, access: { required: true, granted: false } };
+    await t.controller.activate();
+    t.controller.selectCatalogueGarment('coral-crew-tee', 'Coral crew tee');
+    t.controller.setCapture(photo());
+    expect(t.controller.readyToGenerate()).toBe(false);
+    t.controller.requestGenerate();
+    expect(t.client.calls).toEqual(['capabilities']);
+
+    expect(await t.controller.unlock('wrong')).toBe(false);
+    expect(t.controller.getState().access.error?.code).toBe('access-denied');
+    expect(t.controller.readyToGenerate()).toBe(false);
+
+    expect(await t.controller.unlock('right-code-1')).toBe(true);
+    expect(t.controller.getState().access).toEqual({ unlocking: false, error: null });
+    expect(t.controller.readyToGenerate()).toBe(true);
+
+    // The access cookie expired meanwhile: the session request is refused.
+    t.client.createSession = async () => {
+      throw new AiApiError('access-required', 403, 'Enter the access code to use AI photo mode.');
+    };
+    t.controller.requestGenerate();
+    t.controller.acceptConsent();
+    await flush();
+    expect(t.controller.getState().phase).toBe('error');
+    expect(t.controller.accessGranted()).toBe(false);
+    expect(t.client.calls.filter((c) => c === 'submit')).toHaveLength(0);
+  });
+});
+
+describe('AI controller: a build without the AI server', () => {
+  it('explains that AI runs only on the kiosk and never calls the API', async () => {
+    const client = new FakeClient();
+    const controller = new AiTryOnController({
+      client,
+      now: () => 0,
+      setTimeout: () => 0,
+      clearTimeout: () => undefined,
+      createObjectURL: () => 'blob:test/1',
+      revokeObjectURL: () => undefined,
+      randomUUID: () => '00000000-0000-4000-8000-000000000001',
+      backendDeployed: false,
+    });
+    await controller.activate();
+    controller.selectCatalogueGarment('coral-crew-tee', 'Coral crew tee');
+    controller.setCapture(photo());
+    controller.requestGenerate();
+    controller.endSession();
+    await flush();
+    const s = controller.getState();
+    expect(s.phase).toBe('unconfigured');
+    expect(s.unavailable).toMatchObject({ cause: 'not-deployed' });
+    expect(s.capture).toBeNull();
+    expect(client.calls).toEqual([]);
   });
 });
 

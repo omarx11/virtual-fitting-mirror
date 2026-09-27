@@ -298,7 +298,7 @@ describe('jobs over HTTP', () => {
     expect(after.statusCode).toBe(401);
   });
 
-  it('expires idle sessions server-side even if the browser disappears', async () => {
+  it('expires idle sessions server-side even if the browser disappears, images included', async () => {
     let now = 10_000_000;
     const config = testConfig({ AI_SESSION_IDLE_SECONDS: '30' });
     const fake = new FakeProvider({ scenario: 'success', stepMs: 10 });
@@ -310,11 +310,10 @@ describe('jobs over HTTP', () => {
       () => built.services.jobs.inFlightCount(),
       (n) => n === 0,
     );
+    expect(await built.services.jobs.hasStoredResult(id)).toBe(true);
     now += 31_000;
-    await waitFor(
-      () => built.services.jobs.size(),
-      (n) => n === 0,
-    );
+    // The result never outlives the idle timeout (its time to live is capped by it).
+    expect(await built.services.jobs.hasStoredResult(id)).toBe(false);
     const res = await built.app.inject({ url: `/api/ai/jobs/${id}`, headers: browserHeaders(cookie) });
     expect(res.statusCode).toBe(401);
   });

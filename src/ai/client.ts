@@ -42,6 +42,8 @@ export interface AiClient {
   capabilities(signal?: AbortSignal): Promise<AiCapabilities>;
   createSession(signal?: AbortSignal): Promise<AiSessionView>;
   endSession(): Promise<void>;
+  /** Sends the access code of a public deployment; the server answers with an HttpOnly cookie. */
+  unlock(code: string, signal?: AbortSignal): Promise<void>;
   submitJob(input: SubmitJobInput, signal?: AbortSignal): Promise<AiJobView>;
   jobStatus(id: string, signal?: AbortSignal): Promise<AiJobView>;
   jobResult(id: string, signal?: AbortSignal): Promise<Blob>;
@@ -99,6 +101,14 @@ export function createHttpAiClient(): AiClient {
     async endSession() {
       // keepalive lets the purge complete even if the page is being closed.
       await request('/session', { method: 'DELETE', keepalive: true });
+    },
+    async unlock(code, signal) {
+      await request('/access', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+        ...(signal ? { signal } : {}),
+      });
     },
     async submitJob(input, signal) {
       const form = new FormData();

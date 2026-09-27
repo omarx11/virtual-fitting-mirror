@@ -19,7 +19,7 @@ export type AiGarmentPhotoType = 'flat-lay' | 'model' | 'auto';
  * Version of the shopper opt-in text. The backend rejects a job whose consent version does not match,
  * so changing the wording (or the provider) forces a new opt-in.
  */
-export const AI_CONSENT_VERSION = 'fashn-cloud-2026-09-27';
+export const AI_CONSENT_VERSION = 'fashn-cloud-2026-09-27-v2';
 
 export const AI_PROVIDER_RETENTION_URL = 'https://docs.fashn.ai/api-overview/data-retention-privacy';
 
@@ -48,6 +48,11 @@ export interface AiCapabilities {
   consentVersion: string;
   /** Developer uploads (a person photo instead of the camera, a garment photo) are accepted. */
   devUploads: boolean;
+  /**
+   * Public deployments protect paid generations with an access code: `required` when the server has
+   * one, `granted` when this browser has entered it (an HttpOnly cookie the page cannot read).
+   */
+  access: { required: boolean; granted: boolean };
   limits: { maxUploadBytes: number; maxInputPixels: number };
   localResultTtlSeconds: number;
   jobDeadlineSeconds: number;
@@ -82,6 +87,8 @@ export type AiErrorCode =
   | 'session-expired'
   | 'not-found'
   | 'forbidden'
+  | 'access-required'
+  | 'access-denied'
   | 'pose'
   | 'moderation'
   | 'image-load'

@@ -59,7 +59,8 @@ npm start                 # serves dist\ and /api at http://127.0.0.1:3001
 `npm run preview` still serves only the static `dist\` (2D/3D) at http://localhost:4173. Uploading
 `dist\` alone to a static web host cannot run AI mode: the backend must serve the same origin
 (`npm start`, or a reverse proxy that serves `dist\` and forwards `/api` to it). The backend has no
-user accounts; keep it on `127.0.0.1` unless you add authentication and HTTPS.
+user accounts; keep it on `127.0.0.1` unless you add authentication and HTTPS. For a public online
+version with AI (Redis + an access code), see [Deploying to Vercel](#deploying-to-vercel).
 
 ## AI mode setup (optional, paid)
 
@@ -184,6 +185,8 @@ even lighting, roughly 1–3 m away. Chest-up framing is supported. The 3D shirt
 | `npm run dev` | Web app (Vite, React Strict Mode on) + AI backend, together |
 | `npm run dev:web` / `npm run dev:api` | Only the web app / only the backend (tsx watch) |
 | `npm run build` | Type-check, frontend build (`dist\`) and server bundle (`dist-server\`) |
+| `npm run build:vercel` | What Vercel runs: the site (`dist\`) plus the AI function bundle (`dist-vercel\`) |
+| `npm run build:static` | Static site only, for hosts without the AI server (AI mode says it is not available) |
 | `npm start` | Production: serve `dist\` and `/api` from one origin (http://127.0.0.1:3001) |
 | `npm run preview` | Serve the static `dist\` only (2D/3D) |
 | `npm run typecheck` | `tsc -b` (strict: app, unit tests, node config and server projects) |
@@ -210,9 +213,11 @@ also blocks the usage metrics MediaPipe would otherwise send to Google:
   header (Vite dev/preview and the production server).
 
 **AI mode is the exception.** After the shopper agrees, the page sends one captured photo to the
-local server (same origin), and **that server** sends it with the garment image to FASHN's cloud.
-The browser never contacts FASHN and never sees the key. Locally, photos and results stay in memory
-only and are deleted on End session, after an idle timeout, or 2 minutes after a result. FASHN
+AI server (same origin: the kiosk's local server, or the Vercel Function), and **that server** sends
+it with the garment image to FASHN's cloud. The browser never contacts FASHN and never sees the key.
+The server never stores the photo; it keeps the generated image (in memory on the kiosk, in the
+Redis database on Vercel) until End session, the idle timeout, or 2 minutes after the result,
+whichever comes first. FASHN
 deletes its temporary input copy after processing, keeps request records without images, and keeps
 base64 results retrievable for 60 minutes
 ([retention policy](https://docs.fashn.ai/api-overview/data-retention-privacy)). Ending the session
@@ -220,7 +225,73 @@ here cannot delete provider-side data.
 
 If you host `dist\` on another web server (2D/3D only), the fetch guard and the meta tag are
 already included in the build. For a second layer inside the worker, configure the server to also
-send the header `Content-Security-Policy: connect-src 'self' ws: wss: blob: data:`.
+send the header `Content-Security-Policy: connect-src 'self' blob: data:` (`vercel.json` does this
+on Vercel).
+
+## Deploying to Vercel
+
+Vercel runs the whole app: the site (2D/3D, both languages, `/research`) from its CDN, and AI mode
+through one Vercel Function (`api/ai-gateway.js` → `server/vercel.ts`) that runs the same backend as
+the kiosk. What differs from the kiosk:
+
+- **Shared state in Redis.** Vercel starts and stops function instances freely, so sessions, jobs,
+  results (with their time to live) and the daily credit ledger live in an Upstash Redis database
+  shared by every instance. The credit cap, the one-job-per-session rule and the global concurrency
+  bound hold across instances; a job is finished by whichever instance the shopper's next status
+  read reaches, even if the one that submitted it has stopped.
+- **An access code.** The site is public, so starting a paid generation needs `AI_ACCESS_CODE`.
+  Visitors enter it once in the AI panel; the browser then stays unlocked for `AI_ACCESS_HOURS`
+  (default 12) through a signed HttpOnly cookie. Wrong codes are limited to 10 per 15 minutes per
+  client. Without the code the rest of the site works normally.
+- **Limits.** A request to a function may carry 4.5 MB, so uploads are capped at 4 MB (photos are
+  downscaled to 2048 px in the browser first, typically 0.2–0.6 MB). Background work (submission
+  and provider polling) runs within the function's 300 s maximum duration (Hobby plan).
+
+Set up (once):
+
+1. Push the repository to GitHub (a personal account: Vercel's free Hobby plan cannot connect repos
+   owned by a GitHub organization) and import it on vercel.com (**Add New → Project**). Keep the
+   detected settings; they come from `vercel.json`.
+2. In the project: **Storage → Create Database → Upstash for Redis** (Marketplace), choose the
+   **Frankfurt (eu-central-1)** region and connect it to the project. This adds `KV_REST_API_URL` and
+   `KV_REST_API_TOKEN`; the server finds them on its own. The function also runs in Frankfurt
+   (`regions` in `vercel.json`), the Vercel region closest to Saudi Arabia, so every Redis call stays
+   inside one data centre.
+3. **Settings → Environment Variables** (Production; add Preview too if previews should run AI):
+   - `AI_ENABLED` = `true`
+   - `FASHN_API_KEY` = your FASHN key (mark it **Sensitive**)
+   - `AI_ACCESS_CODE` = a code of at least 8 characters, shared only with the people who may generate
+   - `AI_MAX_DAILY_CREDITS` = the daily spending cap in credits (default 20; 1 credit ≈ $0.075)
+4. Redeploy (Deployments → ⋯ → Redeploy) so the variables apply, then open the site over its
+   `https://` address (the camera only works over HTTPS).
+
+Without Redis or an access code, AI mode says why it is unavailable (Diagnostics shows the exact
+reason) and never contacts FASHN; 2D and 3D are unaffected.
+
+The repository files involved:
+
+- **`vercel.json`** — build (`npm ci`, `npm run build:vercel`, output `dist`), the function (300 s,
+  with the AI product photos attached), the `/api/ai/*` rewrite, the Frankfurt region, the security
+  headers of the local servers (`Content-Security-Policy`, so the tracking worker cannot contact
+  other sites either; `nosniff`; `no-referrer`; a `Permissions-Policy` that allows only the
+  camera) and caching (fingerprinted `/assets/` for a year; models and garment images for a day).
+- **`.vercelignore`** — keeps tests, test footage, docs, authoring sources, local builds and any
+  `.env` file out of the deployment. It applies to Git and CLI deployments, and listed files are
+  removed *before* the build, so never add a file the build reads (see the comment in it).
+- **`npm run build:vercel`** — downloads and verifies the pose models (they are not committed),
+  type-checks and builds the site, then bundles the function into `dist-vercel/`.
+
+Checked locally before deploying: `vercel build` (Vercel's own packaging) on exactly the files a Git
+deployment contains, then the packaged function run against a real Redis in Docker with the offline
+fake provider (access code → session → job → result → end session), plus
+`tests/server/redis.integration.test.ts` (see the comment at its top for the Docker commands).
+
+Notes: Vercel deploys `main` to production and every other branch (e.g. `development`) as a
+preview; with Standard Protection (Settings → Deployment Protection), preview links need a Vercel
+login. Vercel builds with Node.js 24 (the `engines` range allows it). Leave Vercel Web Analytics and
+Speed Insights **off**: they contact Vercel from the page, which this app's privacy rules block.
+The free Hobby plan is for non-commercial use, which fits this graduation project; Upstash's free
+plan (256 MB, 500K commands a month) is far more than this app uses.
 
 ## Troubleshooting
 
@@ -264,8 +335,9 @@ src/garments/     catalogue (2D | 3D union), image preloading, modelLoader (GLB 
 src/physics/      cloth mode: proxy builder, Jolt world, body colliders, ClothSimulation (lazy-loaded)
 src/inspect/      development-only 3D inspection view (/?inspect=3d)
 src/research/     visual research / testing / limitations summary page (/research, also linked from About)
-server/           Node backend (Fastify): config, AI routes, sessions, jobs, daily credit ledger,
-                  image validation (Sharp), providers (FASHN SDK adapter, offline fake)
+server/           Node backend (Fastify): config, AI routes, sessions, jobs, daily credit ledger, access
+                  code, state store (memory or Redis), image validation (Sharp), providers (FASHN
+                  SDK adapter, offline fake); vercel.ts = the Vercel Function entry
 src/config/       documented thresholds, quality presets, 3D render settings
 public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLB (third-party);
                   ai/<id>/ demo product photos for AI mode (assets/garments/ai/SOURCE.md)
@@ -277,6 +349,7 @@ scripts/          setup-assets.mjs, generate-garments.mjs, inspect-garment.mjs, 
 tests/unit, tests/server, tests/e2e, tests/fixtures
 docs/             RESEARCH, IMPLEMENTATION_PLAN, TESTING, LIMITATIONS, AI_TRYON_RESEARCH
 spike.html        standalone worker/delegate timing check (dev server: /spike.html)
+api/, vercel.json, .vercelignore  Vercel deployment: the AI function and its settings (see Deploying to Vercel)
 ```
 
 ## How the 3D shirt works

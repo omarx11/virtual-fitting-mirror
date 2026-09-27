@@ -19,3 +19,8 @@ dist-server/
 !.env.example
 # Durable AI usage ledger (credit counts only, no images); local to each kiosk.
 .ai-usage/
+
+# Vercel Function bundle (npm run build:vercel)
+dist-vercel/
+# Vercel CLI local project link / build output
+.vercel/

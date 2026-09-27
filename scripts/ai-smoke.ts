@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { decodeProviderOutput, normalizeImage } from '../server/ai/images';
-import { UsageLedger } from '../server/ai/ledger';
+import { FileLedger } from '../server/ai/ledger';
 import { PRESETS } from '../server/ai/presets';
 import { FashnProvider } from '../server/ai/providers/fashn';
 import { mapRuntimeError, ProviderSubmitError } from '../server/ai/providers/types';
@@ -81,11 +81,13 @@ const category = (catalogue?.category ?? values.category) as AiGarmentCategory;
 const photoType = (catalogue?.photoType ?? values['photo-type']) as AiGarmentPhotoType;
 const tNormalized = performance.now();
 
-const ledger = new UsageLedger(ai.ledgerPath, ai.maxDailyCredits);
+const ledger = new FileLedger(ai.ledgerPath, ai.maxDailyCredits);
 const jobId = `smoke-${new Date().toISOString()}`;
 if (ledger.loadError) fail(ledger.loadError);
-if (!ledger.reserve(jobId, definition.credits)) {
-  fail(`Daily credit cap reached (AI_MAX_DAILY_CREDITS=${ai.maxDailyCredits}, used ${ledger.usedToday()}).`);
+if (!(await ledger.reserve(jobId, definition.credits))) {
+  fail(
+    `Daily credit cap reached (AI_MAX_DAILY_CREDITS=${ai.maxDailyCredits}, used ${(await ledger.today()).used}).`,
+  );
 }
 
 const provider = new FashnProvider({ apiKey: ai.apiKey, submitTimeoutMs: ai.submitTimeoutSeconds * 1000 });
@@ -104,8 +106,8 @@ try {
   ({ providerJobId } = await provider.submit(request, AbortSignal.timeout(ai.submitTimeoutSeconds * 1000)));
 } catch (error) {
   const e = error instanceof ProviderSubmitError ? error : null;
-  if (e?.kind === 'rejected') ledger.release(jobId);
-  else ledger.markUncertain(jobId);
+  if (e?.kind === 'rejected') await ledger.release(jobId);
+  else await ledger.markUncertain(jobId);
   fail(
     e?.kind === 'rejected'
       ? `Provider rejected the request (${e.code}). Nothing was charged.`
@@ -151,7 +153,7 @@ const report: Record<string, unknown> = {
 };
 
 if (status.state === 'completed') {
-  ledger.charge(jobId, status.creditsUsed ?? definition.credits);
+  await ledger.charge(jobId, status.creditsUsed ?? definition.credits);
   const image = await decodeProviderOutput(status.output[0], {
     maxBytes: 3 * ai.maxUploadBytes,
     maxPixels: ai.maxInputPixels,
@@ -164,10 +166,10 @@ if (status.state === 'completed') {
     report.savedTo = out;
   }
 } else if (status.state === 'failed') {
-  ledger.release(jobId);
+  await ledger.release(jobId);
   report.error = mapRuntimeError(status.errorName);
 } else {
-  ledger.markUncertain(jobId);
+  await ledger.markUncertain(jobId);
   report.error = 'deadline or unknown terminal state; not retried';
 }
 

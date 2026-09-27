@@ -7,6 +7,7 @@
  *
  * Inline `code` in backticks is rendered as <code> by `withCode` (src/i18n/format.tsx).
  */
+import type { AiUnavailableCause } from '../ai/controller';
 import type { AiErrorCode } from '../ai/types';
 import type { TrackerLoadingStep } from '../app/MirrorEngine';
 import type { TrackingPhase } from '../fitting/interpreter';
@@ -100,7 +101,7 @@ export const en = {
     privacyLive:
       'Approximate visual preview — not a size or fit measurement, and your own clothing may show at the edges. ',
     privacyCommon:
-      '2D and 3D video stays on this device; the page itself only talks to this computer, and outgoing requests (including MediaPipe usage metrics) are blocked.',
+      '2D and 3D video stays on this device; the page only talks to the site it was loaded from, and every other outgoing request (including MediaPipe usage metrics) is blocked.',
   },
   modes: {
     label: 'Try-on mode',
@@ -263,7 +264,15 @@ export const en = {
     panelLead:
       'Take a photo, choose a garment and generate one still image. This is not live, and not a size or fit guide: colours, logos and details may differ from the real product.',
     unavailableTitle: 'AI preview is unavailable.',
-    unavailableReason: (reason: string, _backendDown: boolean) => reason,
+    accessTitle: 'Access code',
+    accessHint:
+      'This online demo protects paid AI previews with an access code. Enter the code you were given; this browser then stays unlocked for a few hours.',
+    accessPlaceholder: 'Access code',
+    accessUnlock: 'Unlock',
+    accessUnlocking: 'Checking…',
+    accessGranted: 'Access code accepted on this browser.',
+    accessFirst: 'Enter the access code in the panel first',
+    unavailableReason: (reason: string, _cause: AiUnavailableCause) => reason,
     setup: 'Setup (staff)',
     setupSteps: [
       'Copy `.env.example` to `.env` in the project folder.',
@@ -317,6 +326,7 @@ export const en = {
     // Stage
     checking: 'Checking the AI service…',
     unconfigured: 'AI preview is unavailable on this device. See the panel for details.',
+    notDeployed: 'AI photo mode is not available on this copy of the site. See the panel for details.',
     instructions:
       'Face the camera with your upper body in view and your arms slightly away from your body, then take a photo.',
     capture: 'Capture photo',
@@ -359,7 +369,7 @@ export const en = {
     } as AccentText,
     consentMore: 'What happens to the photo?',
     consentPoints: [
-      'This device keeps the photo and result only in memory and deletes them when you end the session.',
+      'This screen keeps your photo and the result only in memory. The AI server keeps the generated image for a few minutes at most, so this screen can load it, and never stores your photo; ending the session deletes both at once.',
       'FASHN deletes its temporary copy of the photo after processing; the generated image stays retrievable there for up to 60 minutes, and request records (without images) are kept. FASHN states it does not train on customer content.',
       'Ending the session here cannot delete data already held by FASHN.',
     ],

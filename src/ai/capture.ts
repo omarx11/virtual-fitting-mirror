@@ -1,8 +1,12 @@
 /**
  * Still-image helpers for AI mode. Captures are drawn from the RAW decoded video (or a still photo)
  * into a temporary canvas — never from the stage canvas, which contains garments, landmarks and
- * letterboxing — at the source's native size and orientation, unmirrored. Mirroring is applied once,
- * at display time, to the captured and generated images alike.
+ * letterboxing — in the source's orientation, unmirrored. Mirroring is applied once, at display
+ * time, to the captured and generated images alike.
+ *
+ * Images larger than CAPTURE_LONG_SIDE are downscaled here, before upload: the server would reduce
+ * them to that size anyway (AI_UPLOAD_LONG_SIDE), so sending more pixels only costs upload time
+ * and stays further from Vercel's 4.5 MB request limit.
  */
 
 export interface CapturedImage {
@@ -16,6 +20,16 @@ export interface CapturedImage {
 
 /** JPEG quality for captured frames (visually lossless; the backend re-encodes anyway). */
 export const CAPTURE_JPEG_QUALITY = 0.92;
+/** Longest side sent to the server; matches its default AI_UPLOAD_LONG_SIDE (server/config.ts). */
+export const CAPTURE_LONG_SIDE = 2048;
+/** Largest photo file read at all (developer uploads); it is downscaled before upload. */
+const MAX_PHOTO_FILE_BYTES = 40 * 1024 * 1024;
+
+/** The size an image is drawn at: its own, or scaled down to fit `longSide` (never enlarged). */
+export function fitWithin(width: number, height: number, longSide = CAPTURE_LONG_SIDE) {
+  const scale = Math.min(1, longSide / Math.max(width, height));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
 
 export function canvasToJpeg(
   canvas: HTMLCanvasElement,
@@ -24,14 +38,13 @@ export function canvasToJpeg(
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', quality));
 }
 
-/** Draws the video's current decoded frame at its intrinsic size. Returns null without a frame. */
+/** Draws the video's current decoded frame (downscaled to CAPTURE_LONG_SIDE). Null without a frame. */
 export async function captureVideoFrame(
   video: HTMLVideoElement,
 ): Promise<Omit<CapturedImage, 'source'> | null> {
   if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return null;
-  const width = video.videoWidth;
-  const height = video.videoHeight;
-  if (!width || !height) return null;
+  if (!video.videoWidth || !video.videoHeight) return null;
+  const { width, height } = fitWithin(video.videoWidth, video.videoHeight);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -67,7 +80,7 @@ export class PhotoError extends Error {
  */
 export async function loadPhotoFile(file: File, maxBytes: number): Promise<CapturedImage> {
   if (!PHOTO_TYPES.includes(file.type)) throw new PhotoError('type', 'Choose a JPEG, PNG or WebP photo.');
-  if (file.size > maxBytes) throw new PhotoError('size', 'That photo is too large.');
+  if (file.size > MAX_PHOTO_FILE_BYTES) throw new PhotoError('size', 'That photo is too large.');
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -76,18 +89,21 @@ export async function loadPhotoFile(file: File, maxBytes: number): Promise<Captu
   }
   try {
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    const size = fitWithin(bitmap.width, bitmap.height);
+    canvas.width = size.width;
+    canvas.height = size.height;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new PhotoError('convert', 'Canvas is unavailable.');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const blob = await canvasToJpeg(canvas);
     const { width, height } = canvas;
     canvas.width = 0;
     canvas.height = 0;
     if (!blob) throw new PhotoError('convert', 'That photo could not be converted.');
+    if (blob.size > maxBytes) throw new PhotoError('size', 'That photo is too large.');
     return { blob, width, height, source: 'photo', mediaTimeMs: null };
   } finally {
     bitmap.close();

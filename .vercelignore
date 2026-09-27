@@ -1,0 +1,35 @@
+# Files Vercel does not need (vercel.json → npm run build:vercel builds the site and the AI function).
+# Applies to CLI uploads and to Git deployments (listed files are removed before the build), so
+# nothing the build reads may be listed here: package*.json, index.html, vite*.config.ts,
+# tsconfig*.json, src/, server/, api/, public/ and scripts/setup-assets.mjs must stay.
+# Patterns start with "/" so they match only at the project root ("assets/" alone would also
+# remove src/assets/, which the app needs).
+
+# Secrets and local data: never upload (Vercel's CLI skips .env.local but not .env)
+/.env
+/.env.*
+/.ai-usage/
+
+# Local builds, downloads and reports (Vercel installs, downloads the models and builds itself)
+/dist/
+/dist-server/
+/dist-vercel/
+/public/models/
+/test-results/
+/playwright-report/
+*.tsbuildinfo
+
+# Tests, test footage and tooling (checked locally with npm run check, not at deploy time)
+/tests/
+/test-footage/
+/playwright.config.ts
+/playwright.preview.config.ts
+/biome.json
+
+# Authoring sources, documentation and development-only tools
+/assets/
+/docs/
+/spike.html
+/src/spike.ts
+/scripts/*
+!/scripts/setup-assets.mjs

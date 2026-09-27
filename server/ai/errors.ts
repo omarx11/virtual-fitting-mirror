@@ -32,6 +32,8 @@ export const JOB_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   'session-expired': 'Your AI session ended. Please start again.',
   'not-found': 'That preview no longer exists.',
   forbidden: 'This request is not allowed.',
+  'access-required': 'Enter the access code to use AI photo mode.',
+  'access-denied': 'That access code is not correct.',
   pose: 'The person could not be detected clearly. Face the camera with your upper body visible, then retake.',
   moderation: 'The images were rejected by the provider’s content safety check.',
   'image-load': 'The provider could not read the images.',

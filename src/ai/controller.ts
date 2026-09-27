@@ -50,11 +50,17 @@ export type AiGarmentChoice =
       photoType: AiGarmentPhotoType;
     };
 
+/**
+ * Why AI cannot be used: turned off / not configured on the server, the local AI server is not
+ * running, or this build has no AI server at all (a static online deployment, `vite build --mode static`).
+ */
+export type AiUnavailableCause = 'disabled' | 'backend-down' | 'not-deployed';
+
 export interface AiViewState {
   phase: AiPhase;
   capabilities: AiCapabilities | null;
   /** Why AI cannot be used (operator-facing). */
-  unavailable: { reason: string; backendDown: boolean } | null;
+  unavailable: { reason: string; cause: AiUnavailableCause } | null;
   capture: { url: string; width: number; height: number; source: CapturedImage['source'] } | null;
   garment: AiGarmentChoice | null;
   preset: AiPresetId | null;
@@ -71,6 +77,8 @@ export interface AiViewState {
   error: { code: AiErrorCode | 'network'; message: string } | null;
   /** Transient information, e.g. a reconnect notice while polling. */
   notice: string | null;
+  /** Access-code entry on public deployments (see `unlock`). */
+  access: { unlocking: boolean; error: { code: AiErrorCode | 'network'; message: string } | null };
 }
 
 export interface AiControllerDeps {
@@ -83,6 +91,8 @@ export interface AiControllerDeps {
   randomUUID: () => string;
   /** Client-side idle reset of a customer's AI data (the server enforces its own timeout). */
   idleResetMs?: number;
+  /** False for a build without the AI server: AI mode explains itself and never calls the API. */
+  backendDeployed?: boolean;
   pollIntervalMs?: number;
 }
 
@@ -100,6 +110,7 @@ export const INITIAL_AI_STATE: AiViewState = {
   result: null,
   error: null,
   notice: null,
+  access: { unlocking: false, error: null },
 };
 
 export class AiTryOnController {
@@ -143,6 +154,19 @@ export class AiTryOnController {
   /** Entering AI mode: reads capabilities only (no session, no upload). */
   async activate(): Promise<void> {
     if (this.disposed) return;
+    if (this.deps.backendDeployed === false) {
+      this.set({
+        ...INITIAL_AI_STATE,
+        phase: 'unconfigured',
+        garment: this.state.garment,
+        unavailable: {
+          reason:
+            'This copy of the site was built without the AI server, so AI photo mode is not available here. 2D and 3D work as usual.',
+          cause: 'not-deployed',
+        },
+      });
+      return;
+    }
     const epoch = ++this.epoch;
     this.set({ ...INITIAL_AI_STATE, phase: 'checking', garment: this.state.garment });
     try {
@@ -152,7 +176,7 @@ export class AiTryOnController {
         this.set({
           phase: 'unconfigured',
           capabilities: caps,
-          unavailable: { reason: caps.reason ?? 'AI preview is not available.', backendDown: false },
+          unavailable: { reason: caps.reason ?? 'AI preview is not available.', cause: 'disabled' },
         });
         return;
       }
@@ -166,7 +190,7 @@ export class AiTryOnController {
           reason: down
             ? 'The local AI server is not running (start it with npm run dev, or npm start after a build).'
             : 'The local AI server returned an error.',
-          backendDown: down,
+          cause: down ? 'backend-down' : 'disabled',
         },
       });
     }
@@ -309,8 +333,45 @@ export class AiTryOnController {
       s.capture !== null &&
       s.garment !== null &&
       s.capabilities?.enabled === true &&
+      this.accessGranted() &&
       s.preset !== null
     );
+  }
+
+  /** False while a public deployment still needs its access code from this browser. */
+  accessGranted(): boolean {
+    const access = this.state.capabilities?.access;
+    return !access?.required || access.granted;
+  }
+
+  /**
+   * Sends the access code (public deployments). On success the server sets an HttpOnly cookie and
+   * generating is allowed; the code itself is never stored by the page.
+   */
+  async unlock(code: string): Promise<boolean> {
+    const caps = this.state.capabilities;
+    if (!caps?.access?.required || this.state.access.unlocking || this.disposed) return false;
+    this.set({ access: { unlocking: true, error: null } });
+    try {
+      await this.deps.client.unlock(code);
+      const current = this.state.capabilities ?? caps;
+      this.set({
+        capabilities: { ...current, access: { required: true, granted: true } },
+        access: { unlocking: false, error: null },
+      });
+      return true;
+    } catch (error) {
+      const e = toApiError(error);
+      this.set({ access: { unlocking: false, error: { code: e.code, message: e.message } } });
+      return false;
+    }
+  }
+
+  /** The server no longer accepts this browser's access (cookie expired or code changed). */
+  private lockAccess(): void {
+    const caps = this.state.capabilities;
+    if (caps?.access?.required)
+      this.set({ capabilities: { ...caps, access: { required: true, granted: false } } });
   }
 
   // ---- internals --------------------------------------------------------------------------------
@@ -410,6 +471,7 @@ export class AiTryOnController {
         this.retryRequest = { id: clientRequestId, key };
       }
       if (e.code === 'session-expired') this.sessionReady = false;
+      if (e.code === 'access-required') this.lockAccess();
       this.fail(
         e.code,
         e.code === 'session-expired' ? 'Your AI session ended. Press Generate to start again.' : e.message,
@@ -473,6 +535,7 @@ export class AiTryOnController {
       }
       this.jobId = null;
       if (e.code === 'session-expired') this.sessionReady = false;
+      if (e.code === 'access-required') this.lockAccess();
       this.fail(e.code, e.message);
     }
   }

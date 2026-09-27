@@ -152,7 +152,8 @@ export function AiResultView({
         {phase === 'checking' && <p className="hint">{m.ai.checking}</p>}
         {phase === 'unconfigured' && (
           <p className="ai-bar-text">
-            <TriangleAlert aria-hidden size={18} /> {m.ai.unconfigured}
+            <TriangleAlert aria-hidden size={18} />{' '}
+            {state.unavailable?.cause === 'not-deployed' ? m.ai.notDeployed : m.ai.unconfigured}
           </p>
         )}
         {(phase === 'ready' || phase === 'error') && (
@@ -298,7 +299,9 @@ export function AiResultView({
               className="button primary large"
               onClick={() => controller.requestGenerate()}
               disabled={active || phase === 'consent' || !controller.readyToGenerate()}
-              title={garmentLabel ? undefined : m.ai.chooseFirst}
+              title={
+                !controller.accessGranted() ? m.ai.accessFirst : garmentLabel ? undefined : m.ai.chooseFirst
+              }
             >
               <Sparkles aria-hidden size={20} /> {phase === 'error' ? m.ai.generateAgain : m.ai.generate}
             </button>
@@ -310,7 +313,10 @@ export function AiResultView({
           )}
         </div>
         {active && <p className="hint">{m.ai.retakeNote}</p>}
-        {!showResult && !active && !garmentLabel && <p className="hint">{m.ai.choosePanel}</p>}
+        {!showResult && !active && !controller.accessGranted() && <p className="hint">{m.ai.accessFirst}.</p>}
+        {!showResult && !active && controller.accessGranted() && !garmentLabel && (
+          <p className="hint">{m.ai.choosePanel}</p>
+        )}
       </motion.div>
     </div>
   );

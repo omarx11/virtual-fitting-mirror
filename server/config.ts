@@ -2,13 +2,21 @@
  * Server configuration from environment variables (see .env.example). Secrets are read here and
  * never leave the server: the capabilities endpoint reports only whether AI is usable.
  *
- * Invalid numbers or names fail fast with a clear message. A missing API key does NOT fail: the app
- * still serves 2D/3D and AI reports itself as unconfigured.
+ * Two platforms:
+ *   - 'node': one long-running process (`npm run dev`, `npm start` on the kiosk). State lives in
+ *     memory, the credit ledger in a file.
+ *   - 'vercel': the same app as a Vercel Function (server/vercel.ts). Many short-lived instances
+ *     share their state and the credit ledger through Redis, and paid generations need an access
+ *     code because the site is public.
+ *
+ * Invalid numbers or names fail fast with a clear message. A missing API key, Redis database or
+ * access code does NOT fail: the app still serves 2D/3D and AI reports itself as unconfigured.
  */
 import { isAbsolute, join, resolve } from 'node:path';
 import { AI_PRESET_IDS, type AiPresetId } from '../src/ai/types';
 
 export type ProviderName = 'fashn' | 'fake';
+export type Platform = 'node' | 'vercel';
 
 export type FakeScenario =
   | 'success'
@@ -54,6 +62,13 @@ export interface AiConfig {
   devUploads: boolean;
   /** Durable non-image usage ledger (daily credit cap), or null for in-memory only (tests). */
   ledgerPath: string | null;
+  /** Where sessions, jobs and results live: this process, or the shared Redis database. */
+  store: 'memory' | 'redis';
+  /** Upstash Redis REST credentials (store 'redis'); the token never leaves the server. */
+  redis: { url: string; token: string } | null;
+  /** Shared access code for paid generations (required on Vercel), or null. */
+  accessCode: string | null;
+  accessLifetimeHours: number;
   fakeScenario: FakeScenario;
   fakeStepMs: number;
   /** Reason AI cannot be used right now, or null when it can. */
@@ -61,11 +76,19 @@ export interface AiConfig {
 }
 
 export interface ServerConfig {
+  platform: Platform;
   production: boolean;
   host: string;
   port: number;
   /** Exact origins allowed to call /api/ai (Origin header) — also defines the allowed Host values. */
   allowedOrigins: string[];
+  /**
+   * Vercel: requests only arrive for the project's own domains (production, previews, custom), so
+   * instead of a fixed list the Origin must equal https://<Host>.
+   */
+  sameOriginHosts: boolean;
+  /** Mark cookies Secure (always on Vercel, which serves HTTPS only). */
+  secureCookies: boolean;
   /** Built frontend to serve at the same origin (production), or null. */
   staticRoot: string | null;
   /** Directory the AI catalogue's product images are resolved in (public/ or the built dist/). */
@@ -130,8 +153,13 @@ function normalizeOrigin(value: string): string {
   return url.origin;
 }
 
-export function loadConfig(env: Env, options: { production: boolean; root: string }): ServerConfig {
+export function loadConfig(
+  env: Env,
+  options: { production: boolean; root: string; platform?: Platform },
+): ServerConfig {
   const { production, root } = options;
+  const platform = options.platform ?? 'node';
+  const vercel = platform === 'vercel';
   const host = str(env, 'AI_HOST') ?? '127.0.0.1';
   const port = int(env, 'AI_PORT', 3001, 1, 65535);
 
@@ -157,6 +185,29 @@ export function loadConfig(env: Env, options: { production: boolean; root: strin
   }
   const ledger = str(env, 'AI_LEDGER_PATH') ?? join('.ai-usage', 'ledger.json');
   const apiKey = str(env, 'FASHN_API_KEY') ?? null;
+  const store = (str(env, 'AI_STORE') ?? (vercel ? 'redis' : 'memory')) as AiConfig['store'];
+  if (store !== 'memory' && store !== 'redis') {
+    throw new ConfigError(`AI_STORE must be "memory" or "redis" (got "${store}").`);
+  }
+  if (vercel && store !== 'redis') {
+    throw new ConfigError('On Vercel AI_STORE must be "redis": instances do not share memory.');
+  }
+  // The Vercel Marketplace integration sets KV_REST_API_*; a database made on upstash.com, UPSTASH_*.
+  const redisUrl = str(env, 'UPSTASH_REDIS_REST_URL') ?? str(env, 'KV_REST_API_URL');
+  const redisToken = str(env, 'UPSTASH_REDIS_REST_TOKEN') ?? str(env, 'KV_REST_API_TOKEN');
+  const accessCode = str(env, 'AI_ACCESS_CODE') ?? null;
+  if (accessCode !== null && accessCode.length < 8) {
+    throw new ConfigError('AI_ACCESS_CODE must be at least 8 characters long.');
+  }
+  const sessionIdleSeconds = int(env, 'AI_SESSION_IDLE_SECONDS', 600, 30, 86_400);
+  // A request to a Vercel Function may carry at most 4.5 MB, photos and form fields included.
+  const maxUploadBytes = int(
+    env,
+    'AI_MAX_UPLOAD_BYTES',
+    vercel ? 4 * 1024 * 1024 : 8 * 1024 * 1024,
+    64 * 1024,
+    vercel ? 4 * 1024 * 1024 : 30 * 1024 * 1024,
+  );
 
   const ai: AiConfig = {
     switchedOn: bool(env, 'AI_ENABLED', false),
@@ -166,16 +217,21 @@ export function loadConfig(env: Env, options: { production: boolean; root: strin
     presets: [...presets],
     maxConcurrentJobs: int(env, 'AI_MAX_CONCURRENT_JOBS', 1, 1, 6),
     maxDailyCredits: int(env, 'AI_MAX_DAILY_CREDITS', 20, 0, 100_000),
-    resultTtlSeconds: int(env, 'AI_RESULT_TTL_SECONDS', 120, 10, 3600),
+    // A result never outlives the session idle timeout, so an idle session takes its image with it.
+    resultTtlSeconds: Math.min(int(env, 'AI_RESULT_TTL_SECONDS', 120, 10, 3600), sessionIdleSeconds),
     jobDeadlineSeconds: int(env, 'AI_JOB_DEADLINE_SECONDS', 120, 5, 600),
-    sessionIdleSeconds: int(env, 'AI_SESSION_IDLE_SECONDS', 600, 30, 86_400),
+    sessionIdleSeconds,
     submitTimeoutSeconds: int(env, 'AI_SUBMIT_TIMEOUT_SECONDS', 60, 1, 300),
-    pollIntervalMs: int(env, 'AI_POLL_INTERVAL_MS', 1500, 5, 30_000),
-    maxUploadBytes: int(env, 'AI_MAX_UPLOAD_BYTES', 8 * 1024 * 1024, 64 * 1024, 30 * 1024 * 1024),
+    pollIntervalMs: int(env, 'AI_POLL_INTERVAL_MS', 1000, 5, 30_000),
+    maxUploadBytes,
     maxInputPixels: int(env, 'AI_MAX_INPUT_PIXELS', 40_000_000, 10_000, 100_000_000),
     maxUploadLongSide: int(env, 'AI_UPLOAD_LONG_SIDE', 2048, 512, 4096),
     devUploads: bool(env, 'AI_DEV_UPLOADS', !production),
     ledgerPath: ledger === 'memory' ? null : isAbsolute(ledger) ? ledger : resolve(root, ledger),
+    store,
+    redis: redisUrl && redisToken ? { url: redisUrl, token: redisToken } : null,
+    accessCode,
+    accessLifetimeHours: int(env, 'AI_ACCESS_HOURS', 12, 1, 24 * 30),
     fakeScenario,
     fakeStepMs: int(env, 'AI_FAKE_STEP_MS', 700, 1, 60_000),
     unavailableReason: null,
@@ -190,7 +246,13 @@ export function loadConfig(env: Env, options: { production: boolean; root: strin
     ai.unavailableReason = 'The offline test provider is disabled in production.';
   } else if (ai.maxDailyCredits === 0) {
     ai.unavailableReason = 'The daily AI credit limit is 0 (AI_MAX_DAILY_CREDITS).';
-  } else if (!isLoopbackHost(host) && !bool(env, 'AI_ALLOW_NON_LOOPBACK', false)) {
+  } else if (store === 'redis' && !ai.redis) {
+    ai.unavailableReason =
+      'No Redis database is connected (add "Upstash for Redis" to the project in the Vercel Marketplace).';
+  } else if (vercel && !accessCode) {
+    ai.unavailableReason =
+      'Set AI_ACCESS_CODE (at least 8 characters) in the Vercel project settings: the site is public.';
+  } else if (!vercel && !isLoopbackHost(host) && !bool(env, 'AI_ALLOW_NON_LOOPBACK', false)) {
     ai.unavailableReason =
       'AI is disabled because the server listens beyond this computer without access control. ' +
       'Bind to 127.0.0.1, or add authentication + HTTPS and set AI_ALLOW_NON_LOOPBACK=true.';
@@ -202,12 +264,17 @@ export function loadConfig(env: Env, options: { production: boolean; root: strin
   }
 
   return {
+    platform,
     production,
     host,
     port,
     allowedOrigins: [...origins],
-    staticRoot: production ? resolve(root, 'dist') : null,
-    catalogueRoot: resolve(root, production ? 'dist' : 'public'),
+    sameOriginHosts: vercel,
+    secureCookies: vercel,
+    // On Vercel the CDN serves the frontend; the function only answers /api/ai.
+    staticRoot: production && !vercel ? resolve(root, 'dist') : null,
+    // Vercel ships public/garments/ai/ with the function (vercel.json → includeFiles).
+    catalogueRoot: resolve(root, production && !vercel ? 'dist' : 'public'),
     logLevel,
     ai,
   };
