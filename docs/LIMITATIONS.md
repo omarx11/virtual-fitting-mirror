@@ -111,7 +111,8 @@ relaxed.
   model; the app only trusts landmarks that are both visible and in-bounds.
 - **One person.** With several people the app keeps the previously tracked person and prefers to
   fade out rather than jump. After 1.5 s without them, the largest, most central person is picked.
-  In the crowd test clip, the garment appeared on another person after the dancer was lost.
+  In the crowd test clip (since retired from the footage kit), the garment appeared on another person
+  after the dancer was lost.
 - **Distance.** Beyond ~4 m (model card), or with very small shoulders (<12 px), tracking is
   unreliable or rejected.
 - **Temporal behaviour.** Short dropouts (≤350 ms) are bridged, then the shirt fades out. Poses more

@@ -17,14 +17,13 @@ const CLIPS = [
   'Jumping_jacks_and_burpees.webm|5/57',
   'Squat_and_Frontal_Raise.webm|7/7f',
   'Squat_-_exercise_demonstration_video.webm|5/5c',
-  'A_woman_on_dancing_floor.webm|d/d2',
 ].map((line) => {
   const [file, hash] = line.split('|');
   return { file, url: `https://upload.wikimedia.org/wikipedia/commons/${hash}/${file}` };
 });
 
-// Digital crops of the full-body clip. They test partial framing / re-entry logic, NOT different
-// camera perspectives.
+// Digital crops of the full-body clip. They test partial framing logic, NOT different camera
+// perspectives. (Retired clips are listed in SOURCES.md and are no longer fetched.)
 const DERIVED = [
   {
     out: 'derived_upper_landscape.mp4',
@@ -45,24 +44,6 @@ const DERIVED = [
     ],
   },
   {
-    out: 'derived_upper_portrait.webm',
-    args: [
-      '-t',
-      '20',
-      '-i',
-      'Jumping_jacks_and_burpees.webm',
-      '-vf',
-      'crop=96:128:267:108,scale=360:480:flags=lanczos',
-      '-c:v',
-      'libvpx-vp9',
-      '-b:v',
-      '0',
-      '-crf',
-      '32',
-      '-an',
-    ],
-  },
-  {
     out: 'derived_full_portrait.mp4',
     args: [
       '-t',
@@ -71,24 +52,6 @@ const DERIVED = [
       'Jumping_jacks_and_burpees.webm',
       '-vf',
       'crop=240:320:195:60,scale=480:640:flags=lanczos',
-      '-c:v',
-      'libx264',
-      '-pix_fmt',
-      'yuv420p',
-      '-crf',
-      '20',
-      '-an',
-    ],
-  },
-  {
-    out: 'derived_leave_reenter.mp4',
-    args: [
-      '-t',
-      '16',
-      '-i',
-      'Jumping_jacks_and_burpees.webm',
-      '-vf',
-      "crop=240:320:'if(lt(t,3),400,if(lt(t,8),195,if(lt(t,11),0,195)))':60,scale=480:640:flags=lanczos",
       '-c:v',
       'libx264',
       '-pix_fmt',

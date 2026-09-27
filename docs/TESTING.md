@@ -230,10 +230,10 @@ Cases reviewed:
 | --- | --- |
 | Neutral / arms at the sides | ✅ registered on shoulders; collar at the neck base after a calibration fix (it sat at the chin before) |
 | Left arm, right arm, both raised | ✅ sleeves follow independently; armpit stretch and "stubby" sleeves when hands are overhead |
-| Modest turns | ✅ in synthetic poses and the dance clip; ⚠️ no slow real turn footage |
+| Modest turns | ✅ in synthetic poses and the dance clip (since retired); ⚠️ no slow real turn footage |
 | Leaning / bending | ✅ lean follows (synthetic); bending over is hidden (existing rule) |
 | Toward/away movement | ⚠️ scale follows image lengths; only digital crops and burpees available |
-| Tracking loss and recovery | ✅ burpees and leave/re-enter: fades out, reacquires with a reset (cloth resets too) |
+| Tracking loss and recovery | ✅ burpees and leave/re-enter (since retired): fades out, reacquires with a reset (cloth resets too) |
 | Crossed forearms (occlusion) | ⚠️ **no footage with forearms crossed in front of the chest**; synthetic tests only. On real clips the cutouts only touched forearms outside the garment; no torso holes |
 | Head dropped forward | ⚠️ the stand collar overlaps the chin (documented) |
 | Physical webcam | ❌ **not tested** (none connected); only Chromium's fake camera |
@@ -323,17 +323,24 @@ Clips: see `test-footage/SOURCES.md` (openly licensed; derived clips are **digit
 different camera positions). Checked through landmark overlays, contact sheets of the running app,
 and traces of the phase and diagnostics.
 
+Rows marked *(retired clip)* were run on clips that have since been removed from the footage kit
+(listed under "Retired clips" in `test-footage/SOURCES.md`). The results stand as recorded, but they
+cannot be re-run from the current kit. The logic behind them stays covered by unit tests on
+synthetic poses: hold-then-lost and fresh re-acquisition, keeping the tracked person when a second
+one appears, and the face-visibility gate (`tests/unit/interpreter.test.ts`,
+`tests/unit/statusAndPrefs.test.ts`).
+
 | Case | Ran? | Clip(s) | Observed result |
 | --- | --- | --- | --- |
 | Front-facing torso / full body | ✅ | Jumping jacks | Stable shirt on the torso during jumping jacks; sleeves follow raised arms (screenshot below). |
 | Starts with hips off-screen | ✅ | derived_upper_landscape (from frame 0) | "Upper-body view" from the first detection; shirt placed from shoulders × default ratio. |
 | Near/far movement | ⚠️ partial | Distance changes only through crops and the burpees | Scale follows the shoulders with log-space smoothing. **No real walking toward/away from the camera was available.** |
-| Mild lean / rotation | ✅ partial | Jumping jacks, dance | Rotation follows the shoulder line; moderate yaw fades the shirt instead of distorting it. |
+| Mild lean / rotation | ✅ partial | Jumping jacks, dance *(retired clip)* | Rotation follows the shoulder line; moderate yaw fades the shirt instead of distorting it. |
 | Crossed arms / sideways turn | ⚠️ sideways only | Squat & frontal raise (side), burpees (side-on) | Side views: yaw ~85° → hidden with "Face the mirror". **No crossed-arm footage**; occlusion unvalidated. |
 | Bending over (burpees) | ✅ | Jumping jacks | Head below shoulders / foreshortened torso → hidden. Before the fix, upper-body fallback drew a full-length shirt over the bent body; fixed and unit-tested. |
 | Back view | ✅ | Squat demo | Hidden for the whole clip (screenshot). |
-| Leaves and re-enters | ✅ | derived_leave_reenter | searching → tracking → hold ≤350 ms + fade → "Tracking lost" → clean reacquisition. The stale reference width that flagged re-entry as "narrow" was found and fixed. |
-| Multiple people | ✅ (stress) | Dance (crowd) | Subject kept while tracked; after loss, picks the largest central person. Constant turning means the shirt is hidden most of the time. One case of a shirt drawn on a back-facing man led to the **face-visibility gate** (fixed). |
+| Leaves and re-enters | ✅ | derived_leave_reenter *(retired clip)* | searching → tracking → hold ≤350 ms + fade → "Tracking lost" → clean reacquisition. The stale reference width that flagged re-entry as "narrow" was found and fixed. |
+| Multiple people | ✅ (stress) | Dance (crowd) *(retired clip)* | Subject kept while tracked; after loss, picks the largest central person. Constant turning means the shirt is hidden most of the time. One case of a shirt drawn on a back-facing man led to the **face-visibility gate** (fixed). |
 | Garment switch playing/paused | ✅ | e2e + manual | Immediate, no model reload (initMs unchanged, generation unchanged). |
 | Seek back / restart / loop | ✅ | e2e (synthetic + real) | New generation, stale results dropped (counted), no timestamp errors. |
 | Portrait / landscape / resize / mirror | ✅ | derived_full_portrait, fixtures | Aligned in 1080×1920 kiosk (mirrored), 1500×850 landscape and 390×844 DPR 3 phone with cover crop. |
@@ -368,7 +375,7 @@ This is not photon-to-photon latency; display latency is not included.
 | Lite / CPU / worker | 640×480 → 512×384 | 29.3 | 25.7 | 37.8 / 52.1 | 56.3 / 72.7 | 67 / 100 |
 | Full / CPU / worker | 640×480 → 640×480 | 29.6 | 20.7 | 47.1 / 75.6 | 67.6 / 94.2 | 100 / 101 |
 | Full / GPU / worker | 1280×720 → 640×360 | 29.9 | 30.1 | 14.5 / 16.1 | 15.0 / 16.7 | (hidden: back view) |
-| Full / GPU / worker | 480×640 portrait → 480×640 | 24.6 (clip is 25 fps) | 24.8 | 14.9 / 19.8 | 15.4 / 21.6 | 40 / 40 |
+| Full / GPU / worker (dance clip, retired) | 480×640 portrait → 480×640 | 24.6 (clip is 25 fps) | 24.8 | 14.9 / 19.8 | 15.4 / 21.6 | 40 / 40 |
 | Full / GPU / **main thread (forced worker failure)** | 640×480 → 640×480 | 29.1 | 11.1 (capped at 12) | 13.7 / 19.4 | 30.7 / 56.5 | 67 / 100 |
 
 Other measurements:
