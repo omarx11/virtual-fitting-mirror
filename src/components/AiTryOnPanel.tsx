@@ -1,4 +1,4 @@
-import { ImageUp, KeyRound, LogOut, TriangleAlert } from 'lucide-react';
+import { ImageUp, KeyRound, LogOut, Mars, TriangleAlert, Venus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useRef, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
@@ -33,16 +33,24 @@ function UserKeyForm({
   const key = state.userKey;
   if (key.saved) {
     return (
-      <p className="hint ai-access-ok" role="status" data-testid="ai-key-saved">
-        <KeyRound aria-hidden size={14} />
-        <span>
-          {m.ai.key.saved}
-          {key.credits !== null && ` · ${m.ai.key.credits(key.credits)}`}
-        </span>
-        <button type="button" className="text-button" onClick={() => controller.forgetUserKey()}>
-          {m.ai.key.remove}
-        </button>
-      </p>
+      <>
+        <p className="hint ai-access-ok" role="status" data-testid="ai-key-saved">
+          <KeyRound aria-hidden size={14} />
+          <span>
+            {m.ai.key.saved}
+            {key.credits !== null && ` · ${m.ai.key.credits(key.credits)}`}
+          </span>
+          <button type="button" className="text-button" onClick={() => controller.forgetUserKey()}>
+            {m.ai.key.remove}
+          </button>
+        </p>
+        {/* A saved key that stopped working (revoked, or its account was closed). */}
+        {key.error && (
+          <p className="error-text" role="alert">
+            {m.ai.error(key.error.code, key.error.message)}
+          </p>
+        )}
+      </>
     );
   }
   const submit = async (e: FormEvent) => {
@@ -216,6 +224,19 @@ export function AiTryOnPanel({
                 {checked && <SelectedRing />}
                 <span className="garment-thumb photo">
                   <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
+                  <span
+                    className="garment-audience"
+                    data-audience={g.audience}
+                    role="img"
+                    aria-label={m.ai.audience[g.audience]}
+                    title={m.ai.audience[g.audience]}
+                  >
+                    {g.audience === 'women' ? (
+                      <Venus aria-hidden size={12} strokeWidth={2.6} />
+                    ) : (
+                      <Mars aria-hidden size={12} strokeWidth={2.6} />
+                    )}
+                  </span>
                 </span>
                 <span className="garment-name">{text.label}</span>
                 {g.demo && <span className="badge badge-flat">{m.ai.demo}</span>}

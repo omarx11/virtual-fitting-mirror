@@ -13,6 +13,9 @@
  */
 import type { AiGarmentCategory, AiGarmentPhotoType } from '../ai/types';
 
+/** Who a garment is cut for (shown as a small icon in the picker). */
+export type AiGarmentAudience = 'women' | 'men';
+
 export interface AiGarmentDefinition {
   /** Catalogue entry ID (product + variant). Also the folder under public/garments/ai/. */
   id: string;
@@ -26,6 +29,7 @@ export interface AiGarmentDefinition {
   productImage: string;
   category: AiGarmentCategory;
   photoType: AiGarmentPhotoType;
+  audience: AiGarmentAudience;
   /** Where the photo came from and what it may be used for. */
   provenance: string;
   /** True for placeholder/synthetic images that do not represent a real shop product. */
@@ -38,7 +42,10 @@ const RENDER_NOTE =
   'Synthetic render of the rigged 3D V-neck model (no fabric texture) — demo only, not a shop photo.';
 const PRODUCT_NOTE = 'Product photo supplied by the project owner — a real garment, not a product sold here.';
 
-type EntryOptions = Pick<AiGarmentDefinition, 'category' | 'photoType' | 'demo' | 'liveGarmentId'>;
+type EntryOptions = Pick<
+  AiGarmentDefinition,
+  'category' | 'photoType' | 'audience' | 'demo' | 'liveGarmentId'
+>;
 
 function entry(
   id: string,
@@ -69,8 +76,16 @@ const ONE_PIECE = {
   demo: false,
   liveGarmentId: null,
 } as const;
-/** A render of the live 3D V-neck. */
-const VNECK = { category: 'tops', photoType: 'flat-lay', demo: true, liveGarmentId: 'vneck-3d' } as const;
+const WOMENS = { ...ONE_PIECE, audience: 'women' } as const;
+const MENS = { ...ONE_PIECE, audience: 'men' } as const;
+/** A render of the live 3D V-neck (the men's cut of the model, shirt-male.glb). */
+const VNECK = {
+  category: 'tops',
+  photoType: 'flat-lay',
+  audience: 'men',
+  demo: true,
+  liveGarmentId: 'vneck-3d',
+} as const;
 
 export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
   // Women's
@@ -81,7 +96,7 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Green lace dress',
     'Women’s puff-sleeve lace dress',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    WOMENS,
   ),
   entry(
     'dress-teal-floral',
@@ -90,7 +105,7 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Teal floral dress',
     'Women’s floral wrap midi dress',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    WOMENS,
   ),
   entry(
     'dress-cream-botanical',
@@ -99,7 +114,7 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Cream botanical dress',
     'Women’s printed midi dress with gathered waist',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    WOMENS,
   ),
   entry(
     'jumpsuit-navy-sequin',
@@ -108,7 +123,7 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Navy sequin jumpsuit',
     'Women’s wrap jumpsuit with sequin top and tie belt',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    WOMENS,
   ),
   entry(
     'jumpsuit-black-dot',
@@ -117,18 +132,10 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Black polka-dot jumpsuit',
     'Women’s wide-leg jumpsuit with dotted mesh sleeves',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    WOMENS,
   ),
   // Men's
-  entry(
-    'thobe-white',
-    'thobe',
-    'white',
-    'Saudi thobe',
-    'Men’s white collared thobe',
-    PRODUCT_NOTE,
-    ONE_PIECE,
-  ),
+  entry('thobe-white', 'thobe', 'white', 'Saudi thobe', 'Men’s white collared thobe', PRODUCT_NOTE, MENS),
   entry(
     'thobe-gold-trim',
     'thobe-round-neck',
@@ -136,7 +143,7 @@ export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
     'Gold-trim thobe',
     'Men’s white round-neck thobe with gold trim',
     PRODUCT_NOTE,
-    ONE_PIECE,
+    MENS,
   ),
   entry('vneck-stone', 'vneck', 'stone', 'V-neck · Stone', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),
   entry('vneck-navy', 'vneck', 'navy', 'V-neck · Navy', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),

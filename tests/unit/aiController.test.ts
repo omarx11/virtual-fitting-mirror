@@ -9,6 +9,7 @@ import {
   type AiCapabilities,
   type AiJobStatus,
   type AiJobView,
+  type AiUsageView,
 } from '../../src/ai/types';
 import { createMemoryKeyStore, type UserKeyStore } from '../../src/ai/userKey';
 
@@ -82,7 +83,19 @@ class FakeClient implements AiClient {
     this.calls.push('check-key');
     if (key !== 'fa-good-key-123')
       throw new AiApiError('provider-auth', 403, 'FASHN did not accept this API key.');
-    return { credits: 42 };
+    return { credits: this.keyCredits };
+  }
+  keyCredits = 42;
+  usageView: AiUsageView = {
+    today: { used: 2, cap: 20, remaining: 18, uncertain: 0 },
+    days: [],
+    balance: { total: 7, subscription: 5, onDemand: 2 },
+    balanceError: null,
+    balanceCheckedAt: 0,
+  };
+  async usage() {
+    this.calls.push('usage');
+    return this.usageView;
   }
   async createSession() {
     this.calls.push('session');
@@ -173,10 +186,10 @@ async function readyWithCapture() {
 }
 
 describe('AI controller: nothing is sent without an explicit Generate + opt-in', () => {
-  it('activation only reads capabilities; capture and garment choice send nothing', async () => {
+  it('activation only reads capabilities and credits; capture and garment choice send nothing', async () => {
     const { client, controller } = await readyWithCapture();
     expect(controller.getState().phase).toBe('review');
-    expect(client.calls).toEqual(['capabilities']);
+    expect(client.calls).toEqual(['capabilities', 'usage']);
   });
 
   it('asks for consent before the first upload; declining sends nothing', async () => {
@@ -185,7 +198,7 @@ describe('AI controller: nothing is sent without an explicit Generate + opt-in',
     expect(controller.getState().phase).toBe('consent');
     controller.declineConsent();
     expect(controller.getState().phase).toBe('review');
-    expect(client.calls).toEqual(['capabilities']);
+    expect(client.calls).toEqual(['capabilities', 'usage']);
   });
 
   it('accepting consent creates one session and one job, with the consent version', async () => {
@@ -193,7 +206,7 @@ describe('AI controller: nothing is sent without an explicit Generate + opt-in',
     controller.requestGenerate();
     controller.acceptConsent();
     await flush();
-    expect(client.calls).toEqual(['capabilities', 'session', 'submit']);
+    expect(client.calls).toEqual(['capabilities', 'usage', 'session', 'submit']);
     expect(client.submits[0]).toMatchObject({
       garmentId: 'coral-crew-tee',
       preset: 'max-fast-1k',
@@ -316,6 +329,106 @@ describe("AI controller: the visitor's own API key", () => {
     expect(t.client.userKey).toBeNull();
     expect(t.controller.getState().userKey.saved).toBe(false);
     expect(await t.controller.saveUserKey('fa-good-key-123')).toBe(false);
+  });
+});
+
+describe('AI controller: credits left stay current', () => {
+  it("reads the operator's credits on activation and after a generation", async () => {
+    const t = await readyWithCapture();
+    expect(t.controller.getState().serverCredits).toEqual({ todayLeft: 18, cap: 20, balance: 7 });
+    const before = t.controller.getState().usageRevision;
+    t.client.usageView = {
+      ...t.client.usageView,
+      today: { used: 3, cap: 20, remaining: 17, uncertain: 0 },
+      balance: { total: 6, subscription: 5, onDemand: 1 },
+    };
+    t.controller.requestGenerate();
+    t.controller.acceptConsent();
+    await flush();
+    await t.tick();
+    expect(t.controller.getState().phase).toBe('result');
+    expect(t.controller.getState().serverCredits).toEqual({ todayLeft: 17, cap: 20, balance: 6 });
+    expect(t.controller.getState().usageRevision).toBeGreaterThan(before);
+  });
+
+  it('reads credits as soon as the access code is accepted, and forgets them when it lapses', async () => {
+    const t = setup();
+    t.client.caps = { ...CAPS, access: { required: true, granted: false } };
+    await t.controller.activate();
+    await flush();
+    // Locked: the operator's usage is not readable yet.
+    expect(t.client.calls).toEqual(['capabilities']);
+    expect(t.controller.getState().serverCredits).toBeNull();
+    const before = t.controller.getState().usageRevision;
+
+    expect(await t.controller.unlock('right-code-1')).toBe(true);
+    await flush();
+    expect(t.client.calls).toContain('usage');
+    expect(t.controller.getState().serverCredits?.todayLeft).toBe(18);
+    expect(t.controller.getState().usageRevision).toBeGreaterThan(before);
+
+    t.client.usage = async () => {
+      throw new AiApiError('access-required', 403, 'Enter the access code to use AI photo mode.');
+    };
+    await t.controller.refreshCredits();
+    expect(t.controller.payment()).toBe('access');
+    expect(t.controller.getState().serverCredits).toBeNull();
+  });
+
+  it("shows the visitor key's balance after a reload and after each generation", async () => {
+    const t = setup(createMemoryKeyStore('fa-good-key-123'));
+    await t.controller.activate();
+    await flush();
+    // Saved in an earlier visit: its balance is read again (no operator usage read).
+    expect(t.controller.getState().userKey.credits).toBe(42);
+    expect(t.client.calls).not.toContain('usage');
+
+    t.client.keyCredits = 41;
+    t.controller.selectCatalogueGarment('coral-crew-tee', 'Coral crew tee');
+    t.controller.setCapture(photo());
+    t.controller.requestGenerate();
+    t.controller.acceptConsent();
+    await flush();
+    await t.tick();
+    expect(t.controller.getState().phase).toBe('result');
+    expect(t.controller.getState().userKey.credits).toBe(41);
+  });
+
+  it("switches between the visitor's and the operator's credits when a key is saved or removed", async () => {
+    const t = setup();
+    await t.controller.activate();
+    await flush();
+    expect(t.controller.getState().serverCredits?.todayLeft).toBe(18);
+    const revision = t.controller.getState().usageRevision;
+
+    expect(await t.controller.saveUserKey('fa-good-key-123')).toBe(true);
+    expect(t.controller.getState().serverCredits).toBeNull();
+    expect(t.controller.getState().userKey.credits).toBe(42);
+    expect(t.controller.getState().usageRevision).toBeGreaterThan(revision);
+
+    t.controller.forgetUserKey();
+    await flush();
+    expect(t.controller.getState().userKey.credits).toBeNull();
+    expect(t.controller.getState().serverCredits?.todayLeft).toBe(18);
+  });
+
+  it('flags a saved key that stopped working', async () => {
+    const t = setup(createMemoryKeyStore('fa-revoked-key-1'));
+    await t.controller.activate();
+    await flush();
+    expect(t.controller.getState().userKey).toMatchObject({ saved: true, credits: null });
+    expect(t.controller.getState().userKey.error?.code).toBe('provider-auth');
+  });
+
+  it('drops a credit answer that arrives after leaving AI mode', async () => {
+    const t = setup();
+    let answer!: (v: AiUsageView) => void;
+    t.client.usage = () => new Promise<AiUsageView>((resolve) => (answer = resolve));
+    await t.controller.activate();
+    t.controller.deactivate();
+    answer(t.client.usageView);
+    await flush();
+    expect(t.controller.getState().serverCredits).toBeNull();
   });
 });
 

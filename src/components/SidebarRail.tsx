@@ -29,7 +29,8 @@ export function SidebarRail({
   mirror: boolean;
   onToggleMirror: () => void;
   fullscreen: boolean;
-  onToggleFullscreen: () => void;
+  /** Null where the browser cannot go fullscreen (iPhone). */
+  onToggleFullscreen: (() => void) | null;
   onExpand: () => void;
   onShortcuts: () => void;
   onAbout: () => void;
@@ -66,16 +67,18 @@ export function SidebarRail({
         >
           <FlipHorizontal2 aria-hidden size={19} />
         </button>
-        <button
-          type="button"
-          className="icon-button"
-          aria-pressed={fullscreen}
-          onClick={onToggleFullscreen}
-          aria-label={m.app.fullscreenView}
-          title={withKey(m.view.fullscreen, 'F')}
-        >
-          {fullscreen ? <Minimize aria-hidden size={19} /> : <Expand aria-hidden size={19} />}
-        </button>
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-pressed={fullscreen}
+            onClick={onToggleFullscreen}
+            aria-label={m.app.fullscreenView}
+            title={withKey(m.view.fullscreen, 'F')}
+          >
+            {fullscreen ? <Minimize aria-hidden size={19} /> : <Expand aria-hidden size={19} />}
+          </button>
+        )}
         <button
           type="button"
           className="icon-button keyboard-only"

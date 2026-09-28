@@ -5,6 +5,7 @@ import {
   LoaderCircle,
   LogOut,
   RotateCcw,
+  ShieldCheck,
   Shirt,
   Sparkles,
   TriangleAlert,
@@ -55,6 +56,17 @@ function resultFileName(garment: string, at = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}-${pad(at.getHours())}${pad(at.getMinutes())}`;
   return `fitting-mirror-${slug ? `${slug}-` : ''}${stamp}.jpg`;
+}
+
+/** What happens to the photo, shown while it is taken and reviewed (see the consent dialog for details). */
+function PhotoPrivacy({ testProvider }: { testProvider: boolean }) {
+  const { m } = useI18n();
+  return (
+    <p className="ai-privacy" data-testid="ai-photo-privacy">
+      <ShieldCheck aria-hidden size={14} />
+      <span>{testProvider ? m.ai.photoPrivacyTest : m.ai.photoPrivacy}</span>
+    </p>
+  );
 }
 
 /** Entrance for the floating action bar at the bottom of the stage. */
@@ -158,6 +170,7 @@ export function AiResultView({
   const garmentLabel = aiChoiceLabel(m, state.garment);
   const errorText = error ? m.ai.error(error.code, error.message) : null;
   const payment = controller.payment();
+  const testProvider = state.capabilities?.testProvider ?? false;
 
   if (phase === 'inactive') return null;
 
@@ -189,6 +202,7 @@ export function AiResultView({
             >
               <Camera aria-hidden size={20} /> {m.ai.capture}
             </button>
+            <PhotoPrivacy testProvider={testProvider} />
           </>
         )}
       </motion.div>
@@ -249,7 +263,7 @@ export function AiResultView({
         {phase === 'consent' && (
           <ConsentDialog
             key="consent"
-            testProvider={state.capabilities?.testProvider ?? false}
+            testProvider={testProvider}
             onAccept={() => controller.acceptConsent()}
             onDecline={() => controller.declineConsent()}
           />
@@ -353,6 +367,7 @@ export function AiResultView({
         {!showResult && !active && payment === 'ok' && !garmentLabel && (
           <p className="hint">{m.ai.choosePanel}</p>
         )}
+        {!showResult && !active && <PhotoPrivacy testProvider={testProvider} />}
       </motion.div>
     </div>
   );

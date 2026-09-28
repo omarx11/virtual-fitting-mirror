@@ -4,12 +4,16 @@ import { AiTryOnController, type AiViewState, INITIAL_AI_STATE } from './control
 import { AI_BACKEND_DEPLOYED, AI_BACKEND_HOSTED } from './deployment';
 import { createBrowserKeyStore } from './userKey';
 
-/** A customer's photos, results and opt-in are forgotten after this long without interaction. */
-export const AI_IDLE_RESET_MS = 3 * 60_000;
+/**
+ * A customer's photos, results and opt-in are forgotten after this long without interaction. Long
+ * enough to show a result around; matches the server's default result lifetime (server/config.ts).
+ */
+export const AI_IDLE_RESET_MS = 30 * 60_000;
 
 /**
  * One controller per mounted App. Safe under React Strict Mode: the development double mount
- * creates and disposes a controller that has sent nothing (activation only reads capabilities).
+ * creates and disposes a controller that has sent nothing (activation only reads capabilities and
+ * the credit count).
  * Leaving AI mode (`active` false) abandons pending work and purges the AI session.
  */
 export function useAiTryOn(active: boolean): { state: AiViewState; controller: AiTryOnController | null } {

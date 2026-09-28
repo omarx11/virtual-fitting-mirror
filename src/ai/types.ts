@@ -19,7 +19,7 @@ export type AiGarmentPhotoType = 'flat-lay' | 'model' | 'auto';
  * Version of the shopper opt-in text. The backend rejects a job whose consent version does not match,
  * so changing the wording (or the provider) forces a new opt-in.
  */
-export const AI_CONSENT_VERSION = 'fashn-cloud-2026-09-27-v2';
+export const AI_CONSENT_VERSION = 'fashn-cloud-2026-09-29-v3';
 
 export const AI_PROVIDER_RETENTION_URL = 'https://docs.fashn.ai/api-overview/data-retention-privacy';
 
@@ -161,7 +161,8 @@ export interface AiUsageDay {
 
 /** Staff usage view: local ledger history plus the FASHN account balance when available. */
 export interface AiUsageView {
-  today: { used: number; cap: number; remaining: number; uncertain: number };
+  /** `cap` and `remaining` are null when the server has no daily cap. */
+  today: { used: number; cap: number | null; remaining: number | null; uncertain: number };
   days: AiUsageDay[];
   balance: { total: number; subscription: number; onDemand: number } | null;
   balanceError: string | null;

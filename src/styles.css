@@ -446,6 +446,11 @@ button {
   .rail-mark {
     display: none;
   }
+  /* The expand button and the tools keep their size; only the mode buttons give way. */
+  .rail > .icon-button,
+  .rail-tools {
+    flex: none;
+  }
 }
 
 /* Touch screens: no keyboard hints, larger targets. */
@@ -463,6 +468,55 @@ button {
   }
   select {
     min-height: 44px;
+  }
+}
+
+/* Phones: the folded bar must fit 320–480 px (and the larger touch targets above) without
+   overflowing or squeezing the expand button. Mode buttons share the free width. */
+@media (max-width: 480px) {
+  .rail {
+    gap: 6px;
+    padding-inline: 10px;
+  }
+  .rail .mode-selector.compact {
+    min-width: 0;
+    gap: 2px;
+  }
+  .rail .mode-selector.compact .mode-option {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 42px;
+    max-width: 60px;
+  }
+  .rail-tools {
+    gap: 4px;
+    padding-inline-start: 6px;
+  }
+  .rail .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  /* Retake and Generate fit on one row. */
+  .ai-actions {
+    gap: 6px;
+  }
+  .ai-actions .button.large {
+    padding-inline: 16px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 350px) {
+  .rail {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+  .rail .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+  .rail .mode-selector.compact .mode-option {
+    min-width: 40px;
   }
 }
 
@@ -1036,6 +1090,7 @@ input[type="range"] {
 }
 
 .garment-thumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   display: grid;
@@ -1097,6 +1152,24 @@ input[type="range"] {
   letter-spacing: 0.04em;
   background: var(--accent);
   color: var(--ink);
+}
+
+/* Who the garment is cut for: a small ♀ / ♂ disc in the thumbnail's bottom corner. */
+.garment-audience {
+  position: absolute;
+  bottom: 5px;
+  inset-inline-end: 5px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--blue);
+  /* No disc behind the icon: a soft shadow keeps it readable on light product photos. */
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.6));
+}
+
+.garment-audience[data-audience="women"] {
+  color: var(--pink);
 }
 
 .badge-flat {
@@ -2340,6 +2413,58 @@ kbd {
   position: static;
 }
 
+/* Credits left, in the stage's top corner next to the panel (the top centre holds status and label). */
+.ai-credits {
+  --credits-tone: var(--ok);
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(14, 11, 30, 0.86);
+  border: 1px solid color-mix(in srgb, var(--credits-tone) 50%, transparent);
+  backdrop-filter: blur(10px);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.ai-credits > svg {
+  color: var(--credits-tone);
+}
+
+.ai-credits[data-tone="low"] {
+  --credits-tone: var(--warn);
+}
+
+.ai-credits[data-tone="empty"] {
+  --credits-tone: var(--error);
+  color: var(--error);
+}
+
+/* What happens to the photo: a quiet line under the capture and generate actions. */
+.ai-bar .ai-privacy {
+  margin: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 540px;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  text-align: start;
+}
+
+.ai-privacy > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--teal);
+}
+
 .segmented {
   display: inline-flex;
   padding: 3px;
@@ -2551,6 +2676,21 @@ kbd {
   .ai-bar {
     padding: 12px;
     gap: 8px;
+  }
+  /* Phones: shorter guidance so the bar leaves the camera view visible. */
+  .ai-bar-text {
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+  .ai-bar .ai-privacy {
+    font-size: 0.7rem;
+  }
+  /* Below the centred status pill and result label, which span most of a narrow stage. */
+  .ai-credits {
+    top: calc(max(14px, env(safe-area-inset-top)) + 46px);
+    right: 10px;
+    padding: 4px 10px;
+    font-size: 0.76rem;
   }
 }
 

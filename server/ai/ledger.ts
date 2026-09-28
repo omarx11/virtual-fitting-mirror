@@ -29,14 +29,16 @@ export interface LedgerEntry {
 
 export interface LedgerToday {
   used: number;
-  remaining: number;
+  /** Null when there is no daily cap. */
+  remaining: number | null;
   uncertain: number;
 }
 
 export interface UsageLedger {
   /** Set when the stored ledger cannot be trusted; blocks all reservations. */
   readonly loadError: string | null;
-  readonly cap: number;
+  /** Credits allowed per UTC day; null = no cap (reservations are still recorded). */
+  readonly cap: number | null;
   /** Atomically checks the cap and records a reservation. False when it would exceed it. */
   reserve(id: string, credits: number): Promise<boolean>;
   /** Completed: record the credits actually used (from the provider when it reports them). */
@@ -67,13 +69,18 @@ function usedCredits(entries: Iterable<LedgerEntry>): number {
   return sum;
 }
 
-function todayOf(entries: LedgerEntry[], cap: number): LedgerToday {
+function todayOf(entries: LedgerEntry[], cap: number | null): LedgerToday {
   const used = usedCredits(entries);
   return {
     used,
-    remaining: Math.max(0, cap - used),
+    remaining: cap === null ? null : Math.max(0, cap - used),
     uncertain: entries.filter((e) => e.state === 'uncertain').length,
   };
+}
+
+/** Whether `total` credits would exceed the cap (never, without one). */
+function overCap(total: number, cap: number | null): boolean {
+  return cap !== null && total > cap;
 }
 
 function summarize(entries: Iterable<LedgerEntry>, cutoff: string): AiUsageDay[] {
@@ -124,7 +131,7 @@ export class FileLedger implements UsageLedger {
 
   constructor(
     private readonly path: string | null,
-    private readonly dailyCap: number,
+    private readonly dailyCap: number | null,
     private readonly now: () => number = Date.now,
   ) {
     if (!path) return;
@@ -153,7 +160,7 @@ export class FileLedger implements UsageLedger {
     }
   }
 
-  get cap(): number {
+  get cap(): number | null {
     return this.dailyCap;
   }
 
@@ -173,7 +180,7 @@ export class FileLedger implements UsageLedger {
   async reserve(id: string, credits: number): Promise<boolean> {
     // Synchronous from check to write: concurrent callers cannot interleave in one process.
     if (this.loadError || this.entries[id]) return false;
-    if (usedCredits(this.todays()) + credits > this.dailyCap) return false;
+    if (overCap(usedCredits(this.todays()) + credits, this.dailyCap)) return false;
     this.entries[id] = { day: utcDay(this.now()), credits, state: 'reserved', at: this.now() };
     try {
       this.persist();
@@ -241,11 +248,11 @@ export class KvLedger implements UsageLedger {
 
   constructor(
     private readonly kv: KvStore,
-    private readonly dailyCap: number,
+    private readonly dailyCap: number | null,
     private readonly now: () => number = Date.now,
   ) {}
 
-  get cap(): number {
+  get cap(): number | null {
     return this.dailyCap;
   }
 
@@ -276,7 +283,7 @@ export class KvLedger implements UsageLedger {
     return withLock(this.kv, 'ledger', async () => {
       const day = utcDay(this.now());
       if ((await this.kv.hget(dayKey(day), id)) !== null) return false;
-      if (usedCredits(await this.dayEntries(day)) + credits > this.dailyCap) return false;
+      if (overCap(usedCredits(await this.dayEntries(day)) + credits, this.dailyCap)) return false;
       const entry: LedgerEntry = { day, credits, state: 'reserved', at: this.now() };
       await Promise.all([
         this.kv.hset(dayKey(day), id, JSON.stringify(entry), KEEP_MS),

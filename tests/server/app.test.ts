@@ -177,6 +177,39 @@ describe("a visitor's own API key", () => {
   });
 });
 
+describe('staff usage', () => {
+  it('reads the FASHN balance again as soon as the ledger changes', async () => {
+    const fake = new FakeProvider({ scenario: 'success', stepMs: 10 });
+    let total = 7;
+    let reads = 0;
+    // Stands in for FASHN: the balance is read only from a FASHN provider with the operator's key.
+    Object.assign(fake, {
+      name: 'fashn',
+      balance: async () => {
+        reads++;
+        return { total, subscription: total, onDemand: 0 };
+      },
+    });
+    const config = testConfig({ AI_PROVIDER: 'fashn', FASHN_API_KEY: 'fa-operator-key-1' });
+    const { app, services } = await start(config, fake);
+    const usage = async () => (await app.inject({ url: '/api/ai/usage', headers: browserHeaders() })).json();
+
+    expect((await usage()).balance.total).toBe(7);
+    // Nothing was spent: the cached balance is served without asking FASHN again.
+    total = 6;
+    expect((await usage()).balance.total).toBe(7);
+    expect(reads).toBe(1);
+
+    // A generation was counted: the next read is current.
+    await services.ledger.reserve('job-a', 1);
+    await services.ledger.charge('job-a');
+    const after = await usage();
+    expect(after.today.used).toBe(1);
+    expect(after.balance.total).toBe(6);
+    expect(reads).toBe(2);
+  });
+});
+
 describe('request protection', () => {
   it('rejects missing marker header, foreign origins, cross-site fetches and unknown hosts', async () => {
     const { app } = await start();

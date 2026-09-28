@@ -59,7 +59,8 @@ export interface AiConfig {
   /** Presets the operator may choose in diagnostics (always includes the default). */
   presets: AiPresetId[];
   maxConcurrentJobs: number;
-  maxDailyCredits: number;
+  /** Daily credit cap for the operator's key; null = no cap (AI_MAX_DAILY_CREDITS unset or empty). */
+  maxDailyCredits: number | null;
   resultTtlSeconds: number;
   jobDeadlineSeconds: number;
   sessionIdleSeconds: number;
@@ -211,7 +212,7 @@ export function loadConfig(
   if (accessCode !== null && accessCode.length < 8) {
     throw new ConfigError('AI_ACCESS_CODE must be at least 8 characters long.');
   }
-  const sessionIdleSeconds = int(env, 'AI_SESSION_IDLE_SECONDS', 600, 30, 86_400);
+  const sessionIdleSeconds = int(env, 'AI_SESSION_IDLE_SECONDS', 3600, 30, 86_400);
   // A request to a Vercel Function may carry at most 4.5 MB, photos and form fields included.
   const maxUploadBytes = int(
     env,
@@ -229,9 +230,11 @@ export function loadConfig(
     defaultPreset,
     presets: [...presets],
     maxConcurrentJobs: int(env, 'AI_MAX_CONCURRENT_JOBS', 1, 1, 6),
-    maxDailyCredits: int(env, 'AI_MAX_DAILY_CREDITS', 20, 0, 100_000),
+    // Unset or empty: no daily cap (the FASHN balance is then the only limit). 0 blocks the operator's key.
+    maxDailyCredits:
+      str(env, 'AI_MAX_DAILY_CREDITS') === undefined ? null : int(env, 'AI_MAX_DAILY_CREDITS', 0, 0, 100_000),
     // A result never outlives the session idle timeout, so an idle session takes its image with it.
-    resultTtlSeconds: Math.min(int(env, 'AI_RESULT_TTL_SECONDS', 120, 10, 3600), sessionIdleSeconds),
+    resultTtlSeconds: Math.min(int(env, 'AI_RESULT_TTL_SECONDS', 1800, 10, 3600), sessionIdleSeconds),
     jobDeadlineSeconds: int(env, 'AI_JOB_DEADLINE_SECONDS', 120, 5, 600),
     sessionIdleSeconds,
     submitTimeoutSeconds: int(env, 'AI_SUBMIT_TIMEOUT_SECONDS', 60, 1, 300),

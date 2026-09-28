@@ -67,7 +67,8 @@ export function ViewControls({
   onToggleMirror: () => void;
   onToggleOcclusion: () => void;
   onToggleFabricMotion: () => void;
-  onToggleFullscreen: () => void;
+  /** Null where the browser cannot go fullscreen (iPhone). */
+  onToggleFullscreen: (() => void) | null;
   onToggleFitMode: () => void;
   /** False in AI mode, where no live garment is drawn. */
   garmentToggles?: boolean;
@@ -109,13 +110,15 @@ export function ViewControls({
             label={m.view.fabricMotion}
           />
         )}
-        <Toggle
-          pressed={fullscreen}
-          onToggle={onToggleFullscreen}
-          icon={fullscreen ? <Minimize aria-hidden size={18} /> : <Expand aria-hidden size={18} />}
-          label={m.view.fullscreen}
-          shortcut="F"
-        />
+        {onToggleFullscreen && (
+          <Toggle
+            pressed={fullscreen}
+            onToggle={onToggleFullscreen}
+            icon={fullscreen ? <Minimize aria-hidden size={18} /> : <Expand aria-hidden size={18} />}
+            label={m.view.fullscreen}
+            shortcut="F"
+          />
+        )}
       </div>
       <label className="inline-select">
         <span>{m.view.framing}</span>

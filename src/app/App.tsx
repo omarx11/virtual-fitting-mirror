@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadPhotoFile, PhotoError, type PhotoErrorKind } from '../ai/capture';
 import { useAiTryOn } from '../ai/useAiTryOn';
 import { AboutDialog } from '../components/AboutDialog';
+import { AiCreditsBadge } from '../components/AiCreditsBadge';
 import { AiResultView } from '../components/AiResultView';
 import { AiTryOnPanel } from '../components/AiTryOnPanel';
 import { CreditsCard } from '../components/Credits';
@@ -67,6 +68,8 @@ const RAIL_WIDTH = 76;
 const PANEL_WIDTH = { compact: 320, wide: 368 } as const;
 /** A vertical swipe this long (px) on the bottom sheet's grip folds or unfolds it. */
 const SWIPE_PX = 36;
+/** iPhone Safari cannot put a page element in fullscreen: its fullscreen buttons are left out. */
+const CAN_FULLSCREEN = typeof document !== 'undefined' && document.fullscreenEnabled === true;
 
 type DialogId = 'about' | 'shortcuts';
 
@@ -392,6 +395,7 @@ export function App() {
               now={now}
             />
           )}
+          {aiActive && <AiCreditsBadge state={ai} />}
           <ToastViewport toasts={toasts} />
         </main>
         <motion.aside
@@ -424,7 +428,7 @@ export function App() {
                   mirror={prefs.mirror}
                   onToggleMirror={() => update({ mirror: !prefs.mirror })}
                   fullscreen={fullscreen}
-                  onToggleFullscreen={toggleFullscreen}
+                  onToggleFullscreen={CAN_FULLSCREEN ? toggleFullscreen : null}
                   onExpand={() => setSidebarCollapsed(false)}
                   onShortcuts={() => setDialog('shortcuts')}
                   onAbout={() => setDialog('about')}
@@ -596,7 +600,7 @@ export function App() {
                           onToggleFabricMotion={() =>
                             update({ motion: prefs.motion === 'cloth' ? 'skeletal' : 'cloth' })
                           }
-                          onToggleFullscreen={toggleFullscreen}
+                          onToggleFullscreen={CAN_FULLSCREEN ? toggleFullscreen : null}
                           onToggleFitMode={() =>
                             update({ fitMode: prefs.fitMode === 'contain' ? 'cover' : 'contain' })
                           }

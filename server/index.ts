@@ -27,7 +27,7 @@ try {
   await app.listen({ host: config.host, port: config.port });
   const ai = config.ai.unavailableReason
     ? `AI unavailable - ${config.ai.unavailableReason}`
-    : `AI enabled (provider: ${services.providerName}, preset: ${config.ai.defaultPreset}, daily cap: ${config.ai.maxDailyCredits} credits)`;
+    : `AI enabled (provider: ${services.providerName}, preset: ${config.ai.defaultPreset}, daily cap: ${config.ai.maxDailyCredits === null ? 'none' : `${config.ai.maxDailyCredits} credits`})`;
   console.log(
     `[server] ${production ? 'production' : 'development'} - http://${config.host}:${config.port} - ${ai}`,
   );

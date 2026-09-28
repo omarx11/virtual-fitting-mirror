@@ -305,6 +305,12 @@ export const ar: Messages = {
       credits: (n) => `باقي ${ltr(String(n))} رصيد`,
       remove: 'إزالة',
     },
+    creditsBadge: {
+      left: (n) => `باقي ${ltr(String(n))} رصيد`,
+      keyTitle: 'الرصيد المتبقي في حساب FASHN الخاص بك (رصيد واحد لكل معاينة).',
+      serverTitle: (todayLeft, cap, balance) =>
+        `${cap === null || todayLeft === null ? 'بدون حد يومي' : `متبقٍ ${ltr(String(todayLeft))} من رصيد اليوم (${ltr(String(cap))})`}${balance === null ? '' : ` · ${ltr(String(balance))} في حساب FASHN`} (رصيد واحد لكل معاينة).`,
+    },
     unavailableReason: (reason, cause) =>
       cause === 'not-deployed'
         ? 'هذي النسخة من الموقع مبنية بدون خادم الذكاء الاصطناعي، فوضع صورة الذكاء الاصطناعي غير متاح هنا. الوضعين 2D و3D يشتغلون عادي.'
@@ -321,6 +327,7 @@ export const ar: Messages = {
     garmentPhoto: 'صورة القطعة',
     garmentGroup: 'قطعة الذكاء الاصطناعي',
     demo: 'تجريبي',
+    audience: { women: 'نسائي', men: 'رجالي' },
     uploadedHint: 'صورة قطعة مرفوعة — اختبار تقني، مو منتج معتمد من المتجر.',
     uploadedLabel: (fileName) => `مرفوعة: ${fileName}`,
     devInputs: 'مدخلات اختبار للمطوّرين',
@@ -383,6 +390,8 @@ export const ar: Messages = {
     instructions:
       'قابل الكاميرا وخلّ الجزء العلوي من جسمك باين ويدينك بعيدة شوي عن جسمك، وبعدين التقط الصورة.',
     capture: 'التقط صورة',
+    photoPrivacy: 'لا نحفظ صورتك أبدًا. تُرسل فقط إلى FASHN، خدمة الذكاء الاصطناعي، وبعد موافقتك فقط.',
+    photoPrivacyTest: 'لا نحفظ صورتك أبدًا. وضع الاختبار: الصورة لا تغادر هذا الكمبيوتر.',
     stages: {
       submitting: 'جاري رفع صورتك لخدمة الذكاء الاصطناعي…',
       queued: 'بالانتظار في طابور الخدمة…',
@@ -423,7 +432,7 @@ export const ar: Messages = {
     } as AccentText,
     consentMore: 'وش يصير للصورة؟',
     consentPoints: [
-      'هذي الشاشة تحتفظ بصورتك والنتيجة في الذاكرة فقط. خادم الذكاء الاصطناعي يحفظ الصورة المولّدة لدقائق قليلة كحد أقصى عشان تقدر الشاشة تعرضها، وما يخزّن صورتك أبد؛ وإنهاء الجلسة يحذف الثنتين فورًا.',
+      'هذي الشاشة تحتفظ بصورتك والنتيجة في الذاكرة فقط. خادم الذكاء الاصطناعي يحفظ الصورة المولّدة لمدة أقصاها 30 دقيقة عشان تقدر الشاشة تعرضها، وما يخزّن صورتك أبد؛ وإنهاء الجلسة يحذف الثنتين فورًا.',
       'تحذف FASHN نسختها المؤقتة من الصورة بعد المعالجة؛ الصورة المولّدة تبقى متاحة عندهم لمدة أقصاها 60 دقيقة، وتُحفظ سجلات الطلبات (بدون صور). وتذكر FASHN أنها لا تدرّب نماذجها على محتوى العملاء.',
       'إنهاء الجلسة هنا ما يحذف البيانات اللي صارت عند FASHN.',
     ],
@@ -507,7 +516,7 @@ export const ar: Messages = {
     usageTitle: 'استخدام الذكاء الاصطناعي',
     today: 'اليوم (UTC)',
     todayValue: (used, cap, left, uncertain) =>
-      `${used} / ${cap} رصيد · باقي ${left}${uncertain > 0 ? ` · ${uncertain} غير مؤكد` : ''}`,
+      `${cap === null || left === null ? `${used} رصيد · بدون حد يومي` : `${used} / ${cap} رصيد · باقي ${left}`}${uncertain > 0 ? ` · ${uncertain} غير مؤكد` : ''}`,
     balance: 'رصيد FASHN',
     balanceValue: (total, subscription, onDemand) =>
       `${total} رصيد (اشتراك ${subscription}، حسب الطلب ${onDemand})`,
@@ -518,5 +527,6 @@ export const ar: Messages = {
     uncertain: 'غير مؤكدة',
     usageHint: 'السجل يحسب هذا الكمبيوتر فقط (آخر 30 يوم). لوحة FASHN هي سجل الفوترة الرسمي.',
     refreshUsage: 'تحديث الاستخدام',
+    usageLocked: 'أدخل رمز الدخول في لوحة الذكاء الاصطناعي لعرض الاستخدام.',
   },
 };

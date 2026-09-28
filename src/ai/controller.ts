@@ -92,6 +92,14 @@ export interface AiViewState {
     credits: number | null;
     error: { code: AiErrorCode | 'network'; message: string } | null;
   };
+  /**
+   * What the operator's key has left for this browser (access code or kiosk): today's cap and the
+   * FASHN account balance (`cap` and `todayLeft` are null without a daily cap). Null while unknown,
+   * or while the visitor's own key pays.
+   */
+  serverCredits: { todayLeft: number | null; cap: number | null; balance: number | null } | null;
+  /** Bumped whenever credits may have changed (unlock, key saved or removed, a job ended). */
+  usageRevision: number;
 }
 
 /** What still stands between the shopper and Generate: nothing, their own key, or the access code. */
@@ -132,6 +140,8 @@ export const INITIAL_AI_STATE: AiViewState = {
   notice: null,
   access: { unlocking: false, error: null },
   userKey: { saved: false, checking: false, credits: null, error: null },
+  serverCredits: null,
+  usageRevision: 0,
 };
 
 export class AiTryOnController {
@@ -153,6 +163,8 @@ export class AiTryOnController {
   private idleTimer: unknown = null;
   /** Request ID to reuse after a submission with unknown outcome, bound to the same inputs. */
   private retryRequest: { id: string; key: string } | null = null;
+  /** Incremented per credit read; a late answer for an older read is dropped. */
+  private creditsToken = 0;
   private readonly keys: UserKeyStore;
 
   constructor(private readonly deps: AiControllerDeps) {
@@ -175,7 +187,7 @@ export class AiTryOnController {
 
   // ---- mode lifecycle ---------------------------------------------------------------------------
 
-  /** Entering AI mode: reads capabilities only (no session, no upload). */
+  /** Entering AI mode: reads capabilities and the credit count only (no session, no upload). */
   async activate(): Promise<void> {
     if (this.disposed) return;
     if (this.deps.backendDeployed === false) {
@@ -183,6 +195,7 @@ export class AiTryOnController {
         ...INITIAL_AI_STATE,
         phase: 'unconfigured',
         garment: this.state.garment,
+        usageRevision: this.state.usageRevision,
         unavailable: {
           reason:
             'This copy of the site was built without the AI server, so AI photo mode is not available here. 2D and 3D work as usual.',
@@ -192,7 +205,12 @@ export class AiTryOnController {
       return;
     }
     const epoch = ++this.epoch;
-    this.set({ ...INITIAL_AI_STATE, phase: 'checking', garment: this.state.garment });
+    this.set({
+      ...INITIAL_AI_STATE,
+      phase: 'checking',
+      garment: this.state.garment,
+      usageRevision: this.state.usageRevision,
+    });
     try {
       const caps = await this.deps.client.capabilities();
       if (epoch !== this.epoch || this.disposed) return;
@@ -214,6 +232,7 @@ export class AiTryOnController {
         preset: caps.defaultPreset,
         userKey: { ...INITIAL_AI_STATE.userKey, saved: key !== null },
       });
+      void this.refreshCredits();
     } catch (error) {
       if (epoch !== this.epoch || this.disposed) return;
       // Say what actually failed (status and server message), so the cause can be found.
@@ -403,7 +422,13 @@ export class AiTryOnController {
       if (this.disposed) return false;
       this.keys.set(key);
       this.deps.client.setUserKey(key);
-      this.set({ userKey: { saved: true, checking: false, credits: check.credits, error: null } });
+      // The check already answered with the balance; drop any operator read still in flight.
+      ++this.creditsToken;
+      this.set({
+        userKey: { saved: true, checking: false, credits: check.credits, error: null },
+        serverCredits: null,
+        usageRevision: this.state.usageRevision + 1,
+      });
       return true;
     } catch (error) {
       const e = toApiError(error);
@@ -419,6 +444,7 @@ export class AiTryOnController {
     this.keys.set(null);
     this.deps.client.setUserKey(null);
     this.set({ userKey: INITIAL_AI_STATE.userKey });
+    void this.refreshCredits();
   }
 
   /**
@@ -436,6 +462,7 @@ export class AiTryOnController {
         capabilities: { ...current, access: { required: true, granted: true } },
         access: { unlocking: false, error: null },
       });
+      void this.refreshCredits();
       return true;
     } catch (error) {
       const e = toApiError(error);
@@ -448,7 +475,49 @@ export class AiTryOnController {
   private lockAccess(): void {
     const caps = this.state.capabilities;
     if (caps?.access?.required)
-      this.set({ capabilities: { ...caps, access: { required: true, granted: false } } });
+      this.set({
+        capabilities: { ...caps, access: { required: true, granted: false } },
+        serverCredits: null,
+      });
+  }
+
+  /**
+   * Re-reads what the current payer has left: the balance of the visitor's saved key, or the
+   * operator's credits (today's cap and account balance) once this browser may use them. Reads
+   * counts only, never customer data; a failed read keeps the last known numbers.
+   */
+  async refreshCredits(): Promise<void> {
+    const caps = this.state.capabilities;
+    if (this.disposed || !caps?.enabled) return;
+    const token = ++this.creditsToken;
+    this.set({ usageRevision: this.state.usageRevision + 1 });
+    const key = this.state.userKey.saved ? this.keys.get() : null;
+    try {
+      if (key) {
+        const check = await this.deps.client.checkKey(key);
+        if (token !== this.creditsToken || this.disposed) return;
+        this.set({ userKey: { ...this.state.userKey, credits: check.credits }, serverCredits: null });
+      } else if (caps.keys.server && this.payment() === 'ok') {
+        const usage = await this.deps.client.usage();
+        if (token !== this.creditsToken || this.disposed) return;
+        this.set({
+          serverCredits: {
+            todayLeft: usage.today.remaining,
+            cap: usage.today.cap,
+            balance: usage.balance?.total ?? null,
+          },
+        });
+      } else {
+        this.set({ serverCredits: null });
+      }
+    } catch (error) {
+      if (token !== this.creditsToken || this.disposed) return;
+      const e = toApiError(error);
+      if (e.code === 'access-required') this.lockAccess();
+      // The saved key stopped working (revoked): say so where the key is shown.
+      if (key && e.code === 'provider-auth')
+        this.set({ userKey: { ...this.state.userKey, error: { code: e.code, message: e.message } } });
+    }
   }
 
   // ---- internals --------------------------------------------------------------------------------
@@ -637,6 +706,7 @@ export class AiTryOnController {
         notice: null,
       });
       this.touch();
+      void this.refreshCredits();
     } catch (error) {
       if (epoch !== this.epoch || this.disposed) return;
       this.jobId = null;
@@ -648,6 +718,8 @@ export class AiTryOnController {
   private fail(code: AiErrorCode | 'network', message: string): void {
     this.clearPoll();
     this.set({ phase: 'error', error: { code, message }, notice: null });
+    // A failed or uncertain request may still have been counted.
+    void this.refreshCredits();
   }
 
   private clearPoll(): void {
@@ -694,6 +766,7 @@ export class AiTryOnController {
     if (this.idleTimer !== null) this.deps.clearTimeout(this.idleTimer);
     this.idleTimer = null;
     this.retryRequest = null;
+    if (phase === 'inactive') ++this.creditsToken;
     if (this.sessionReady) {
       this.sessionReady = false;
       this.sessionGeneration++;
@@ -707,6 +780,8 @@ export class AiTryOnController {
       preset: phase === 'inactive' ? null : this.state.preset,
       // The saved key belongs to this browser, not to one customer session.
       userKey: phase === 'inactive' ? INITIAL_AI_STATE.userKey : this.state.userKey,
+      serverCredits: phase === 'inactive' ? null : this.state.serverCredits,
+      usageRevision: this.state.usageRevision,
       // A catalogue choice is not personal data; uploads are dropped.
       garment: g?.kind === 'catalogue' ? g : null,
     });

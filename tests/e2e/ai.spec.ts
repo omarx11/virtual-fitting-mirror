@@ -81,7 +81,7 @@ test.describe('try-on mode selector', () => {
     await expect(page.getByRole('heading', { name: 'AI photo preview' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Shirts' })).toHaveCount(0);
     await expect.poll(() => aiView(page)).toBe('live');
-    // Entering AI mode only reads capabilities.
+    // Entering AI mode only reads capabilities (and the credit count): nothing is posted.
     await expect.poll(() => count(reqs, 'GET', /^\/api\/ai\/capabilities$/)).toBe(1);
     expect(count(reqs, 'POST', /^\/api\//)).toBe(0);
 

@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 // The cap rules are the same for the kiosk (file) and for Vercel (shared key-value store).
-const kinds: [string, (cap: number, now?: () => number) => UsageLedger][] = [
+const kinds: [string, (cap: number | null, now?: () => number) => UsageLedger][] = [
   ['file ledger', (cap, now) => new FileLedger(null, cap, now)],
   ['shared-store ledger', (cap, now) => new KvLedger(new MemoryKv(now), cap, now)],
 ];
@@ -28,6 +28,14 @@ describe.each(kinds)('%s (daily credit cap)', (_name, make) => {
     expect(await ledger.reserve('b', 2)).toBe(true);
     expect(await ledger.reserve('c', 1)).toBe(false);
     expect((await ledger.today()).remaining).toBe(0);
+  });
+
+  it('without a cap, never refuses but still records usage', async () => {
+    const ledger = make(null);
+    expect(ledger.cap).toBeNull();
+    for (let i = 0; i < 50; i++) expect(await ledger.reserve(`n${i}`, 1)).toBe(true);
+    await ledger.charge('n0');
+    expect(await ledger.today()).toEqual({ used: 50, remaining: null, uncertain: 0 });
   });
 
   it('checks the cap atomically under concurrent reservations', async () => {

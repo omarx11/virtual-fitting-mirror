@@ -96,8 +96,9 @@ Spending limits (all enforced by the server; see `.env.example`):
 - one output per explicit **Generate**, one active job per session, `AI_MAX_CONCURRENT_JOBS=1`;
 - duplicate clicks and repeats of the same request are deduplicated; a submission is **never retried
   automatically**, and one whose outcome is unknown (timeout) stays counted;
-- `AI_MAX_DAILY_CREDITS=20` per UTC day, recorded in `.ai-usage/ledger.json` (credit counts only,
-  no images), which survives restarts;
+- `AI_MAX_DAILY_CREDITS` credits per UTC day (e.g. `20`), recorded in `.ai-usage/ledger.json`
+  (credit counts only, no images), which survives restarts. Leave it empty or unset for no daily
+  cap (usage is still recorded; the FASHN balance is then the only limit); `0` blocks your key;
 - the provider is never called while `AI_ENABLED=false`, or without a key (yours or the visitor's).
 
 **Usage:** in AI mode, open **Diagnostics** (`D`) → **AI usage**: today's credits against the cap,
@@ -228,7 +229,7 @@ also blocks the usage metrics MediaPipe would otherwise send to Google:
 AI server (same origin: the kiosk's local server, or the Vercel Function), and **that server** sends
 it with the garment image to FASHN's cloud. The browser never contacts FASHN and never sees the key.
 The server never stores the photo; it keeps the generated image (in memory on the kiosk, in the
-Redis database on Vercel) until End session, the idle timeout, or 2 minutes after the result,
+Redis database on Vercel) until End session, the idle timeout, or 30 minutes after the result,
 whichever comes first. FASHN
 deletes its temporary input copy after processing, keeps request records without images, and keeps
 base64 results retrievable for 60 minutes
@@ -274,7 +275,8 @@ Set up (once):
      access code) visitors use their own key from the AI panel
    - `AI_ACCESS_CODE` = a code of at least 8 characters, shared only with the people who may spend
      your key
-   - `AI_MAX_DAILY_CREDITS` = the daily spending cap in credits (default 20; 1 credit ≈ $0.075)
+   - `AI_MAX_DAILY_CREDITS` = the daily spending cap in credits (e.g. 20; 1 credit ≈ $0.075). If
+     unset, there is **no cap**: anyone with the access code can spend the whole FASHN balance
 4. Redeploy (Deployments → ⋯ → Redeploy) so the variables apply, then open the site over its
    `https://` address (the camera only works over HTTPS).
 

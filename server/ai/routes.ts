@@ -186,8 +186,14 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     return reply.code(204).send();
   });
 
-  // Staff usage view: the credit ledger + FASHN account balance (cached 60 s per instance).
-  let balanceCache: { at: number; balance: ProviderBalance | null; error: string | null } | null = null;
+  // Staff usage view: the credit ledger + FASHN account balance (cached 60 s per instance, and read
+  // again as soon as the ledger changes, so the balance right after a generation is current).
+  let balanceCache: {
+    at: number;
+    used: number;
+    balance: ProviderBalance | null;
+    error: string | null;
+  } | null = null;
   app.get('/usage', lenient, async (req): Promise<AiUsageView> => {
     s.access.require(req.headers.cookie);
     const [today, days] = await Promise.all([s.ledger.today(), s.ledger.summary(30)]);
@@ -205,10 +211,11 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
           : 'No FASHN API key configured.';
       return view;
     }
-    if (!balanceCache || Date.now() - balanceCache.at > 60_000) {
+    if (!balanceCache || balanceCache.used !== today.used || Date.now() - balanceCache.at > 60_000) {
       try {
         balanceCache = {
           at: Date.now(),
+          used: today.used,
           balance: await s.provider.balance(AbortSignal.timeout(10_000)),
           error: null,
         };
@@ -216,6 +223,7 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
         const message = error instanceof Error && error.message.startsWith('FASHN') ? error.message : null;
         balanceCache = {
           at: Date.now(),
+          used: today.used,
           balance: null,
           error: message ?? 'Could not reach FASHN to read the balance.',
         };

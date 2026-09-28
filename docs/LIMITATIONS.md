@@ -186,7 +186,7 @@ relaxed.
   its own origin; the AI server is the only component that contacts the provider. The key never
   reaches the browser.
 - The server never stores the photo (it exists only in memory until it is sent). The generated
-  image is kept until End session, the idle timeout, or 2 minutes after the result, whichever comes
+  image is kept until End session, the idle timeout, or 30 minutes after the result, whichever comes
   first: in memory on the kiosk, in the Upstash Redis database (Frankfurt) on Vercel. Neither is
   written to disk, logs or `localStorage` by the app; the shopper can save it with **Download**.
   FASHN keeps request records (without images) and makes the generated image retrievable for up to

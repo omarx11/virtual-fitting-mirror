@@ -11,6 +11,7 @@ import type { AiUnavailableCause } from '../ai/controller';
 import type { AiErrorCode } from '../ai/types';
 import type { TrackerLoadingStep } from '../app/MirrorEngine';
 import type { TrackingPhase } from '../fitting/interpreter';
+import type { AiGarmentAudience } from '../garments/aiCatalogue';
 import type { SourceErrorKind } from '../media/frameSource';
 import type { InitErrorKind } from '../tracking/protocol';
 
@@ -284,6 +285,12 @@ export const en = {
       credits: (n: number) => `${n} credits left`,
       remove: 'Remove',
     },
+    creditsBadge: {
+      left: (n: number) => (n === 1 ? '1 credit left' : `${n} credits left`),
+      keyTitle: 'Credits left in your FASHN account (one credit per preview).',
+      serverTitle: (todayLeft: number | null, cap: number | null, balance: number | null) =>
+        `${cap === null || todayLeft === null ? 'No daily limit' : `${todayLeft} of today's ${cap} credits left`}${balance === null ? '' : ` · ${balance} in the FASHN account`} (one credit per preview).`,
+    },
     unavailableReason: (reason: string, _cause: AiUnavailableCause) => reason,
     setup: 'Setup (staff)',
     setupSteps: [
@@ -295,6 +302,7 @@ export const en = {
     garmentPhoto: 'Garment photo',
     garmentGroup: 'AI garment',
     demo: 'Demo',
+    audience: { women: 'Women’s', men: 'Men’s' } as Record<AiGarmentAudience, string>,
     uploadedHint: 'Uploaded garment photo — a technical test, not a validated shop product.',
     uploadedLabel: (fileName: string) => `Uploaded: ${fileName}`,
     devInputs: 'Developer test inputs',
@@ -363,6 +371,9 @@ export const en = {
     instructions:
       'Face the camera with your upper body in view and your arms slightly away from your body, then take a photo.',
     capture: 'Capture photo',
+    photoPrivacy:
+      'We never save your photo. It goes only to FASHN, the AI service, and only after you agree.',
+    photoPrivacyTest: 'We never save your photo. Test mode: it never leaves this computer.',
     stages: {
       submitting: 'Uploading your photo to the AI service…',
       queued: 'Waiting in the AI service queue…',
@@ -404,7 +415,7 @@ export const en = {
     } as AccentText,
     consentMore: 'What happens to the photo?',
     consentPoints: [
-      'This screen keeps your photo and the result only in memory. The AI server keeps the generated image for a few minutes at most, so this screen can load it, and never stores your photo; ending the session deletes both at once.',
+      'This screen keeps your photo and the result only in memory. The AI server keeps the generated image for 30 minutes at most, so this screen can load it, and never stores your photo; ending the session deletes both at once.',
       'FASHN deletes its temporary copy of the photo after processing; the generated image stays retrievable there for up to 60 minutes, and request records (without images) are kept. FASHN states it does not train on customer content.',
       'Ending the session here cannot delete data already held by FASHN.',
     ],
@@ -488,8 +499,8 @@ export const en = {
     aiPreset: 'AI preset',
     usageTitle: 'AI usage',
     today: 'Today (UTC)',
-    todayValue: (used: number, cap: number, left: number, uncertain: number) =>
-      `${used} / ${cap} credits · ${left} left${uncertain > 0 ? ` · ${uncertain} uncertain` : ''}`,
+    todayValue: (used: number, cap: number | null, left: number | null, uncertain: number) =>
+      `${cap === null || left === null ? `${used} credits · no daily cap` : `${used} / ${cap} credits · ${left} left`}${uncertain > 0 ? ` · ${uncertain} uncertain` : ''}`,
     balance: 'FASHN balance',
     balanceValue: (total: number, subscription: number, onDemand: number) =>
       `${total} credits (subscription ${subscription}, on-demand ${onDemand})`,
@@ -501,6 +512,7 @@ export const en = {
     usageHint:
       'History counts this computer only (last 30 days). The FASHN dashboard is the official billing record.',
     refreshUsage: 'Refresh usage',
+    usageLocked: 'Enter the access code in the AI panel to see usage.',
   },
 };
 

@@ -1,5 +1,5 @@
 import { Activity, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAiUsage } from '../ai/client';
 import type { AiViewState } from '../ai/controller';
 import type { AiPresetId, AiUsageView } from '../ai/types';
@@ -389,26 +389,45 @@ function AiDiagnostics({
           </select>
         </label>
       )}
-      {/* Usage lives on the local AI server: nothing to ask while it is not running (or not deployed). */}
-      {(!ai.unavailable || ai.unavailable.cause === 'disabled') && <AiUsage />}
+      {/* Usage lives on the local AI server: nothing to ask while it is not running (or not deployed),
+          and it needs the access code where one is set. */}
+      {(!ai.unavailable || ai.unavailable.cause === 'disabled') &&
+        (caps?.access.required && !caps.access.granted ? (
+          <>
+            <h3 className="diag-subtitle">{x.usageTitle}</h3>
+            <p className="hint">{x.usageLocked}</p>
+          </>
+        ) : (
+          <AiUsage revision={ai.usageRevision} />
+        ))}
     </>
   );
 }
 
-/** AI usage for staff: this server's local ledger plus the FASHN account balance. */
-function AiUsage() {
+/**
+ * AI usage for staff: this server's local ledger plus the FASHN account balance. Reloads whenever
+ * `revision` changes (access unlocked, a key saved or removed, a generation ended).
+ */
+function AiUsage({ revision }: { revision: number }) {
   const x = useI18n().m.diag;
   const [usage, setUsage] = useState<AiUsageView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Only the latest read may update the view: an older answer can arrive after a newer one.
+  const latest = useRef(0);
   const load = useCallback(() => {
+    const read = ++latest.current;
     fetchAiUsage()
       .then((u) => {
+        if (read !== latest.current) return;
         setUsage(u);
         setError(null);
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => {
+        if (read === latest.current) setError(e instanceof Error ? e.message : String(e));
+      });
   }, []);
-  useEffect(load, [load]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `revision` only signals that usage changed.
+  useEffect(load, [load, revision]);
   const b = usage?.balance;
   return (
     <>

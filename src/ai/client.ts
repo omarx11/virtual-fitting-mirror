@@ -50,6 +50,8 @@ export interface AiClient {
   setUserKey(key: string | null): void;
   /** Asks the server to check a visitor's API key with the provider (answers with its balance). */
   checkKey(key: string, signal?: AbortSignal): Promise<AiKeyCheck>;
+  /** The operator's usage: today's credit cap and the FASHN balance (counts only, never images). */
+  usage(signal?: AbortSignal): Promise<AiUsageView>;
   submitJob(input: SubmitJobInput, signal?: AbortSignal): Promise<AiJobView>;
   jobStatus(id: string, signal?: AbortSignal): Promise<AiJobView>;
   jobResult(id: string, signal?: AbortSignal): Promise<Blob>;
@@ -129,6 +131,7 @@ export function createHttpAiClient(): AiClient {
       });
       return (await res.json()) as AiKeyCheck;
     },
+    usage: fetchAiUsage,
     async submitJob(input, signal) {
       const form = new FormData();
       form.set('person', input.person, 'person.jpg');

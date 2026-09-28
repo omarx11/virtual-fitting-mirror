@@ -16,8 +16,15 @@ describe('server configuration', () => {
     expect(c.ai.defaultPreset).toBe('max-fast-1k');
     expect(c.ai.presets).toEqual(['max-fast-1k']);
     expect(c.ai.maxConcurrentJobs).toBe(1);
-    expect(c.ai.maxDailyCredits).toBe(20);
-    expect(c.ai.resultTtlSeconds).toBe(120);
+    // No daily cap unless one is set; an explicit 0 blocks the operator's key.
+    expect(c.ai.maxDailyCredits).toBeNull();
+    expect(load({ AI_MAX_DAILY_CREDITS: '' }).ai.maxDailyCredits).toBeNull();
+    expect(load({ AI_MAX_DAILY_CREDITS: '40' }).ai.maxDailyCredits).toBe(40);
+    expect(load({ AI_MAX_DAILY_CREDITS: '0', FASHN_API_KEY: 'k' }).ai.serverKeyReason).toMatch(
+      /AI_MAX_DAILY_CREDITS/,
+    );
+    expect(c.ai.resultTtlSeconds).toBe(1800);
+    expect(c.ai.sessionIdleSeconds).toBe(3600);
   });
 
   it('reports a missing key without failing (2D/3D keep running, visitors may bring their own)', () => {
