@@ -74,6 +74,20 @@ function apiOfflineFallback(target: string): Plugin {
   };
 }
 
+/**
+ * Fills __SITE_ORIGIN__ in index.html's link-preview tags: link crawlers (WhatsApp, X, Slack…) need
+ * an absolute og:image URL. SITE_URL wins; on Vercel the production domain is used automatically.
+ * Without either (local builds) the URLs stay root-relative, which browsers still resolve.
+ */
+function socialPreview(env: Record<string, string | undefined>): Plugin {
+  const production = env.VERCEL_PROJECT_PRODUCTION_URL;
+  const origin = (env.SITE_URL || (production ? `https://${production}` : '')).replace(/\/+$/, '');
+  return {
+    name: 'social-preview',
+    transformIndexHtml: (html) => html.replaceAll('__SITE_ORIGIN__', origin),
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Only AI_PORT / AI_API_TARGET are read here (for the proxy). Secrets are never loaded into the
   // frontend: only VITE_-prefixed variables reach browser code, and none are used.
@@ -83,7 +97,7 @@ export default defineConfig(({ mode }) => {
   // header is kept (changeOrigin: false) so the backend's origin checks see the real page origin.
   const proxy = { '/api': { target: apiTarget, changeOrigin: false } };
   return {
-    plugins: [react(), apiOfflineFallback(apiTarget)],
+    plugins: [react(), apiOfflineFallback(apiTarget), socialPreview(env)],
     server: { headers: securityHeaders, proxy },
     preview: { headers: securityHeaders, proxy },
     define: {

@@ -213,7 +213,7 @@ export function AiTryOnPanel({
                 onClick={() => onSelectGarment(g.id)}
                 whileTap={{ scale: 0.95 }}
               >
-                {checked && <SelectedRing layoutId="ai-garment-ring" />}
+                {checked && <SelectedRing />}
                 <span className="garment-thumb photo">
                   <img src={`${import.meta.env.BASE_URL}${g.preview}`} alt="" width={72} height={72} />
                 </span>

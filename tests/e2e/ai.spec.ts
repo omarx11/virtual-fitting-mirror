@@ -259,6 +259,15 @@ test.describe('AI photo flow (offline fake provider)', () => {
     await expect(page.getByTestId('ai-result')).toHaveClass(/mirrored/);
     expect(count(reqs, 'POST', /^\/api\/ai\/jobs$/)).toBe(1);
 
+    // Download saves the generated JPEG itself (from its blob: URL; nothing is fetched again).
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByTestId('ai-download').click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/^fitting-mirror-saudi-thobe-\d{4}-\d{2}-\d{2}-\d{4}\.jpg$/);
+    expect((await sharp(await download.path()).metadata()).format).toBe('jpeg');
+    expect(count(reqs, 'GET', /\/result$/)).toBe(1);
+
     await page.getByRole('radio', { name: 'Before' }).click();
     await expect(page.getByTestId('ai-before')).toBeVisible();
     await expect(page.getByTestId('ai-result')).toHaveCount(0);

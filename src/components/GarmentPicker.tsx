@@ -7,13 +7,17 @@ import type { Garment2DDefinition, GarmentDefinition } from '../garments/types';
 import { garmentText, materialLabel, swatchLabel } from '../i18n/catalogue';
 import { useI18n } from '../i18n/I18nProvider';
 
-/** The accent ring on the selected card; it glides between cards when the selection changes. */
-export function SelectedRing({ layoutId }: { layoutId: string }) {
+/**
+ * The accent ring on the selected card. It fades in place rather than gliding between cards: a
+ * shared-layout glide also chased the selection across mode switches and panel reflows.
+ */
+export function SelectedRing() {
   return (
     <motion.span
       className="garment-ring"
-      layoutId={layoutId}
-      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.16, ease: 'easeOut' }}
       aria-hidden
     >
       <span className="garment-check">
@@ -95,7 +99,7 @@ export function GarmentPicker({
               title={text.description}
               whileTap={{ scale: 0.95 }}
             >
-              {active && <SelectedRing layoutId="garment-ring" />}
+              {active && <SelectedRing />}
               <span className="garment-thumb">
                 <img src={`${import.meta.env.BASE_URL}${shown.preview}`} alt="" width={72} height={72} />
               </span>

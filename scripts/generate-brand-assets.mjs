@@ -1,9 +1,10 @@
 /**
- * Builds the web-sized Qassim University brand images from the original logo in assets/brand/.
- * Outputs are committed and imported by the app (Vite fingerprints them), so this only needs to run
- * again when the source logo changes: `npm run generate:brand`.
+ * Builds the web-sized Qassim University brand images from the original logo in assets/brand/, and
+ * the link-preview (Open Graph) image from public/icon.svg. Outputs are committed (the brand images
+ * are imported by the app, so Vite fingerprints them), so this only needs to run again when a
+ * source changes: `npm run generate:brand`.
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import sharp from 'sharp';
 
 const SOURCE = 'assets/brand/qassim-university-logo.png';
@@ -34,7 +35,20 @@ await sharp(lattice)
   .webp({ quality: 90, alphaQuality: 100 })
   .toFile(`${OUT}/qassim-university-mark.webp`);
 
-for (const name of ['qassim-university-logo.webp', 'qassim-university-mark.webp']) {
-  const { width, height, size } = await sharp(`${OUT}/${name}`).metadata();
-  console.log(`${name}: ${width}×${height}${size ? `, ${size} B` : ''}`);
+// Link-preview image: the app icon, square and under 600 px so chat apps and social sites show it
+// as the small thumbnail beside the title and description. Drawn full-bleed (no rounded corners):
+// crawlers flatten transparency to white or black, and most previews round the thumbnail anyway.
+const icon = readFileSync('public/icon.svg', 'utf8').replace('rx="16"', 'rx="0"');
+await sharp(Buffer.from(icon), { density: 72 * (512 / 64) })
+  .resize(512, 512)
+  .png({ compressionLevel: 9 })
+  .toFile('public/og-image.png');
+
+for (const path of [
+  `${OUT}/qassim-university-logo.webp`,
+  `${OUT}/qassim-university-mark.webp`,
+  'public/og-image.png',
+]) {
+  const { width, height, size } = await sharp(path).metadata();
+  console.log(`${path}: ${width}×${height}${size ? `, ${size} B` : ''}`);
 }

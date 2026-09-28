@@ -370,6 +370,8 @@ export const en = {
       'AI-generated: colours, logos, fit and details may differ from the real garment. Not a size guide.',
     retake: 'Retake',
     tryAnother: 'Try another garment',
+    download: 'Download',
+    downloadTitle: 'Save the AI-generated photo',
     generate: 'Generate preview',
     generateAgain: 'Generate again',
     chooseFirst: 'Choose a garment first',

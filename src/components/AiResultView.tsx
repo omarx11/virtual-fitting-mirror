@@ -1,6 +1,7 @@
 import {
   Camera,
   Columns2,
+  Download,
   LoaderCircle,
   LogOut,
   RotateCcw,
@@ -39,6 +40,21 @@ function Still({ src, mirror, alt, testId }: { src: string; mirror: boolean; alt
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     />
   );
+}
+
+/**
+ * File name for a downloaded result, e.g. "fitting-mirror-white-thobe-2026-09-28-1412.jpg". The
+ * server always re-encodes results as JPEG. Arabic letters are kept; only filename-unsafe characters go.
+ */
+function resultFileName(garment: string, at = new Date()): string {
+  const slug = garment
+    .toLowerCase()
+    .replace(/[\\/:*?"<>|\s]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}-${pad(at.getHours())}${pad(at.getMinutes())}`;
+  return `fitting-mirror-${slug ? `${slug}-` : ''}${stamp}.jpg`;
 }
 
 /** Entrance for the floating action bar at the bottom of the stage. */
@@ -312,6 +328,17 @@ export function AiResultView({
             >
               <Sparkles aria-hidden size={20} /> {phase === 'error' ? m.ai.generateAgain : m.ai.generate}
             </button>
+          )}
+          {showResult && (
+            <a
+              className="button"
+              href={result.url}
+              download={resultFileName(resultLabel)}
+              title={m.ai.downloadTitle}
+              data-testid="ai-download"
+            >
+              <Download aria-hidden size={18} /> {m.ai.download}
+            </a>
           )}
           {showResult && (
             <button type="button" className="button" onClick={onEndSession}>

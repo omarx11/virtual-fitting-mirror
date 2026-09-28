@@ -16,6 +16,21 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Link previews: a small square image beside the title and description. __SITE_ORIGIN__ is
+         filled in at build time (see socialPreview in vite.config.ts); crawlers need absolute URLs. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Virtual Fitting Mirror" />
+    <meta property="og:title" content="Virtual Fitting Mirror" />
+    <meta property="og:description" content="Live 2D/3D virtual try-on and an optional AI photo preview. A Qassim University graduation project by Lamya." />
+    <meta property="og:image" content="__SITE_ORIGIN__/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Virtual Fitting Mirror icon: a white shirt with a sparkle" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Virtual Fitting Mirror" />
+    <meta name="twitter:description" content="Live 2D/3D virtual try-on and an optional AI photo preview. A Qassim University graduation project by Lamya." />
+    <meta name="twitter:image" content="__SITE_ORIGIN__/og-image.png" />
     <title>Virtual Fitting Mirror</title>
   </head>
   <body>
