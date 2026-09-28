@@ -36,7 +36,7 @@ limitations is in the app at **/research** (About → *Research, testing & limit
 ## Setup (PowerShell)
 
 ```powershell
-cd path\to\virtual-fitting-mirror-feasibility
+cd path\to\virtual-fitting-mirror
 npm ci                    # installs the exact versions from package-lock.json
 npm run setup:assets      # downloads + SHA-256-verifies the pose models into public\models
 npm run dev               # web app on http://localhost:5173 + local API server on 127.0.0.1:3001
