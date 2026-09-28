@@ -1746,22 +1746,6 @@ input[type="range"] {
   align-items: center;
   gap: 16px;
   text-align: center;
-  /* Keeps the scrim below inside the hero, above the fitting-room backdrop. */
-  isolation: isolate;
-}
-
-/* A soft deep-blue scrim behind the text and buttons, so the mirror and bulbs don't compete with them.
-   It stays within .empty-state's padding and fades out towards its edges, so it never reads as a box. */
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: -24px -20px;
-  z-index: -1;
-  border-radius: 40px;
-  background: rgba(10, 12, 34, 0.72);
-  backdrop-filter: blur(10px);
-  mask-image: radial-gradient(ellipse at center, #000 45%, transparent 100%);
-  pointer-events: none;
 }
 
 .hero h1 {
