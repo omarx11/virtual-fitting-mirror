@@ -224,10 +224,14 @@ test.describe('language', () => {
     await expect(page.getByRole('heading', { name: 'مرآة القياس الافتراضية' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'افتح ملف فيديو' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'وضع التجربة' })).toBeVisible();
-    // The sidebar moves to the left of the mirror, and nothing spills sideways.
+    // The sidebar stays on the right of the mirror (the page layout does not flip), its content reads
+    // right to left, and nothing spills sideways.
     const panel = await page.getByRole('complementary').boundingBox();
     const stage = await page.getByRole('main').boundingBox();
-    expect(panel && stage && panel.x < stage.x).toBe(true);
+    expect(panel && stage && panel.x > stage.x).toBe(true);
+    expect(await page.getByRole('complementary').evaluate((el) => getComputedStyle(el).direction)).toBe(
+      'rtl',
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     // Status messages follow the language too.

@@ -1,15 +1,17 @@
 /**
  * Browser client for the local AI backend. Every call is a same-origin request to /api/ai (allowed
- * by the CSP and the local-only fetch guard); the browser never talks to the cloud provider and
- * never sees an API key.
+ * by the CSP and the local-only fetch guard); the browser never talks to the cloud provider. It never
+ * sees the operator's API key; a visitor's own key (see userKey.ts) travels in a header to our server.
  */
 import {
   AI_CLIENT_HEADER,
+  AI_USER_KEY_HEADER,
   type AiCapabilities,
   type AiErrorCode,
   type AiGarmentCategory,
   type AiGarmentPhotoType,
   type AiJobView,
+  type AiKeyCheck,
   type AiPresetId,
   type AiSessionView,
   type AiUsageView,
@@ -44,6 +46,10 @@ export interface AiClient {
   endSession(): Promise<void>;
   /** Sends the access code of a public deployment; the server answers with an HttpOnly cookie. */
   unlock(code: string, signal?: AbortSignal): Promise<void>;
+  /** The visitor's own API key to send with later requests (null: the operator's key pays). */
+  setUserKey(key: string | null): void;
+  /** Asks the server to check a visitor's API key with the provider (answers with its balance). */
+  checkKey(key: string, signal?: AbortSignal): Promise<AiKeyCheck>;
   submitJob(input: SubmitJobInput, signal?: AbortSignal): Promise<AiJobView>;
   jobStatus(id: string, signal?: AbortSignal): Promise<AiJobView>;
   jobResult(id: string, signal?: AbortSignal): Promise<Blob>;
@@ -89,13 +95,16 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
 }
 
 export function createHttpAiClient(): AiClient {
+  let userKey: string | null = null;
+  const withKey = (init: RequestInit = {}): RequestInit =>
+    userKey ? { ...init, headers: { ...(init.headers ?? {}), [AI_USER_KEY_HEADER]: userKey } } : init;
   return {
     async capabilities(signal) {
       const res = await request('/capabilities', signal ? { signal } : {});
       return (await res.json()) as AiCapabilities;
     },
     async createSession(signal) {
-      const res = await request('/session', { method: 'POST', ...(signal ? { signal } : {}) });
+      const res = await request('/session', withKey({ method: 'POST', ...(signal ? { signal } : {}) }));
       return (await res.json()) as AiSessionView;
     },
     async endSession() {
@@ -110,6 +119,16 @@ export function createHttpAiClient(): AiClient {
         ...(signal ? { signal } : {}),
       });
     },
+    setUserKey(key) {
+      userKey = key;
+    },
+    async checkKey(key, signal) {
+      const res = await request('/key', {
+        headers: { [AI_USER_KEY_HEADER]: key },
+        ...(signal ? { signal } : {}),
+      });
+      return (await res.json()) as AiKeyCheck;
+    },
     async submitJob(input, signal) {
       const form = new FormData();
       form.set('person', input.person, 'person.jpg');
@@ -120,11 +139,14 @@ export function createHttpAiClient(): AiClient {
       form.set('preset', input.preset);
       form.set('consentVersion', input.consentVersion);
       form.set('clientRequestId', input.clientRequestId);
-      const res = await request('/jobs', { method: 'POST', body: form, ...(signal ? { signal } : {}) });
+      const res = await request(
+        '/jobs',
+        withKey({ method: 'POST', body: form, ...(signal ? { signal } : {}) }),
+      );
       return (await res.json()) as AiJobView;
     },
     async jobStatus(id, signal) {
-      const res = await request(`/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {});
+      const res = await request(`/jobs/${encodeURIComponent(id)}`, withKey(signal ? { signal } : {}));
       return (await res.json()) as AiJobView;
     },
     async jobResult(id, signal) {

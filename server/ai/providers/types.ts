@@ -50,6 +50,17 @@ export interface TryOnProvider {
   balance?(signal: AbortSignal): Promise<ProviderBalance>;
 }
 
+/** The balance read failed; `status` is the provider's HTTP status when it answered. */
+export class ProviderBalanceError extends Error {
+  constructor(
+    readonly status: number | null,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProviderBalanceError';
+  }
+}
+
 export interface ProviderBalance {
   total: number;
   subscription: number;

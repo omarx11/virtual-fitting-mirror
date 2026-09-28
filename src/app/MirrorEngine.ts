@@ -1133,15 +1133,16 @@ export class MirrorEngine {
       layer3d,
       opacity: this.opacity,
       occlusion: cutouts.length > 0 ? { cutouts } : null,
-      debug:
-        this.settings.showLandmarks && liveGarment
-          ? {
-              observation: this.lastObservation,
-              torso: this.currentTorso,
-              garmentShoulders: this.garmentShoulders,
-              cutouts,
-            }
-          : null,
+      // Landmarks show in AI mode's live preview too: they tell the shopper they are tracked before
+      // taking the photo (garment-only parts are empty there).
+      debug: this.settings.showLandmarks
+        ? {
+            observation: this.lastObservation,
+            torso: this.currentTorso,
+            garmentShoulders: this.garmentShoulders,
+            cutouts,
+          }
+        : null,
       background: BACKGROUND,
     });
     if (layer3d) this.copyMs.push(timings.layerCopyMs);

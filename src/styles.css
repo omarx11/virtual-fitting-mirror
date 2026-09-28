@@ -175,7 +175,8 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-inline-start: 1px solid var(--line);
+  /* Physical side: the sidebar is on the right in every language (see "Arabic & right-to-left"). */
+  border-left: 1px solid var(--line);
   background:
     radial-gradient(120% 50% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
     radial-gradient(90% 40% at 0% 100%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 70%),
@@ -333,7 +334,7 @@ button {
   .app[data-sidebar="folded"] .panel {
     width: auto;
     max-height: 58dvh;
-    border-inline-start: 0;
+    border-left: 0;
     border-top: 1px solid var(--line-strong);
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -18px 40px -24px rgba(0, 0, 0, 0.8);
@@ -600,6 +601,8 @@ fieldset {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface-2);
+  /* A gradient fill starts under the (transparent) border, so it never repeats into the edges. */
+  background-origin: border-box;
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
@@ -689,6 +692,17 @@ button:disabled {
 
 .privacy-note .text-button {
   padding: 0;
+  font-size: inherit;
+}
+
+.privacy-note a.text-button {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-access-ok .text-button {
+  margin-inline-start: auto;
+  padding: 0 4px;
   font-size: inherit;
 }
 
@@ -1446,38 +1460,228 @@ input[type="range"] {
   z-index: 1;
 }
 
-.aurora {
+/* The welcome backdrop: a fitting room with an arched mirror (see FittingRoom in StageOverlay.tsx). */
+.fitting-room {
+  --brass: linear-gradient(160deg, #f6e2bb, #c79a5c 35%, #f3dcae 55%, #9b7442 80%, #e9cc98);
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 50% 0%, rgba(255, 214, 160, 0.14), transparent 70%),
+    radial-gradient(80% 50% at 50% 100%, rgba(160, 124, 255, 0.12), transparent 70%),
+    repeating-linear-gradient(90deg, transparent 0 88px, rgba(255, 255, 255, 0.018) 88px 89px), var(--bg);
 }
 
-.blob {
+/* Warm spotlights falling on the mirror. */
+.room-spot {
   position: absolute;
-  width: 55%;
-  aspect-ratio: 1;
+  top: -10%;
+  width: 38%;
+  height: 95%;
+  background: linear-gradient(180deg, rgba(255, 222, 170, 0.2), rgba(255, 222, 170, 0) 80%);
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  filter: blur(18px);
+  opacity: 0.7;
+}
+
+.room-spot-a {
+  left: 16%;
+  transform: rotate(-12deg);
+}
+
+.room-spot-b {
+  right: 16%;
+  transform: rotate(12deg);
+}
+
+/* Fitting-room curtains on both sides, gathered in soft folds. */
+.curtain {
+  position: absolute;
+  top: 10px;
+  bottom: 0;
+  width: clamp(48px, 13%, 170px);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(11, 9, 24, 0.9)),
+    repeating-linear-gradient(90deg, #2a1740 0 10px, #3d2160 18px, #4c2a78 24px, #331b52 32px, #2a1740 40px);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
+  opacity: 0.85;
+}
+
+.curtain-left {
+  left: 0;
+  border-radius: 0 0 60% 0 / 0 0 12% 0;
+  mask-image: linear-gradient(90deg, #000 70%, transparent);
+}
+
+.curtain-right {
+  right: 0;
+  border-radius: 0 0 0 60% / 0 0 0 12%;
+  mask-image: linear-gradient(270deg, #000 70%, transparent);
+}
+
+.curtain-rod {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--brass);
+  opacity: 0.5;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* The tall arched mirror, framed in brass. */
+.mirror {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  height: min(86%, 780px);
+  aspect-ratio: 0.58;
+  translate: -50% 0;
+  padding: 9px;
+  border-radius: 999px 999px 22px 22px;
+  background: var(--brass);
+  opacity: 0.7;
+  box-shadow:
+    0 30px 80px -30px rgba(0, 0, 0, 0.9),
+    0 0 60px -10px rgba(255, 214, 160, 0.25);
+}
+
+.mirror-glass {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    radial-gradient(90% 60% at 50% 20%, rgba(255, 255, 255, 0.1), transparent 70%),
+    linear-gradient(180deg, #1b1633 0%, #120f26 55%, #0e0c1f 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 0 60px rgba(0, 0, 0, 0.6);
+}
+
+/* A light reflection sweeping across the glass now and then. */
+.mirror-sheen {
+  position: absolute;
+  inset: -10% auto -10% 0;
+  width: 38%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.1) 40%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 60%,
+    transparent
+  );
+  transform: skewX(-12deg);
+}
+
+.mirror-figure {
+  position: absolute;
+  opacity: 0.6;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 78%;
+  width: 84%;
+}
+
+.figure-body {
+  fill: rgba(255, 255, 255, 0.07);
+}
+
+.figure-shirt {
+  fill: rgba(160, 124, 255, 0.1);
+  stroke: url(#fitting-shirt);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+
+.figure-bone {
+  stroke: rgba(47, 214, 193, 0.45);
+  stroke-width: 1.4;
+}
+
+.figure-joint {
+  fill: #2fd6c1;
+  animation: joint-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes joint-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Vanity bulbs down both sides of the frame. */
+.bulbs {
+  position: absolute;
+  top: 22%;
+  bottom: 8%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bulbs-left {
+  left: -22px;
+}
+
+.bulbs-right {
+  right: -22px;
+}
+
+.bulbs i {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.32;
+  background: #ffe7bf;
+  box-shadow:
+    0 0 10px 3px rgba(255, 214, 160, 0.7),
+    0 0 26px 8px rgba(255, 214, 160, 0.25);
+  animation: bulb-glow 3s ease-in-out infinite;
 }
 
-.blob-pink {
-  top: -15%;
-  left: -10%;
-  background: var(--pink);
+@keyframes bulb-glow {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
-.blob-violet {
-  bottom: -25%;
-  left: 25%;
-  background: var(--violet);
+/* The mirror's reflection on a polished floor. */
+.room-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  width: min(60%, 520px);
+  height: 8%;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 214, 160, 0.18), transparent);
 }
 
-.blob-teal {
-  top: -5%;
-  right: -15%;
-  background: var(--teal);
+@container stage (max-width: 620px) {
+  .curtain {
+    width: 28px;
+  }
+  .room-spot,
+  .bulbs {
+    display: none;
+  }
+  .mirror {
+    height: min(80%, 620px);
+  }
 }
 
 .hero {
@@ -1592,6 +1796,30 @@ input[type="range"] {
   font-size: 0.78rem;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+.hero-research {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.hero-research:hover,
+.hero-research:focus-visible {
+  color: var(--text);
+  border-color: var(--line-strong);
 }
 
 @container stage (max-width: 620px) {
@@ -2273,8 +2501,18 @@ kbd {
 }
 
 /* ---- Arabic & right-to-left ------------------------------------------------------------------------
-   Layout rules above use logical properties (inline-start/end), so the grid, the sidebar and text
-   alignment mirror by themselves under dir="rtl". This section covers what cannot flip on its own. */
+   Rules above use logical properties (inline-start/end), so text and the controls inside each area
+   mirror by themselves under dir="rtl". The page layout does not: the mirror stays on the left and
+   the sidebar on the right in both languages, so switching language never moves the controls away
+   from where the shopper's hand already is. This section covers what cannot flip on its own. */
+
+[dir="rtl"] .app {
+  direction: ltr;
+}
+
+[dir="rtl"] .app > * {
+  direction: rtl;
+}
 
 :root:lang(ar) {
   /* IBM Plex Sans Arabic (Saudi DGA platform typeface) for Arabic; Latin words keep Plus Jakarta Sans. */
@@ -2337,6 +2575,8 @@ kbd {
 /* ---- Reduced motion: Motion components already honour it (MotionConfig); CSS animations too. ---- */
 
 @media (prefers-reduced-motion: reduce) {
+  .figure-joint,
+  .bulbs i,
   .spin,
   .gradient-text,
   .chip-live::before,

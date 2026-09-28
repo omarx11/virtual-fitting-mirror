@@ -1,7 +1,7 @@
 import { Box3, type Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { instantiate, maxRestError } from '../../src/garments/modelLoader';
-import { loadVneck } from './garmentModel';
+import { loadVneck, loadVneckFemale } from './garmentModel';
 
 describe('garment model loader (actual local GLB)', () => {
   it('finds one skinned mesh, keeps the full rig hierarchy and repairs the bind pose', async () => {
@@ -45,5 +45,21 @@ describe('garment model loader (actual local GLB)', () => {
     expect(maxRestError(a.mesh)).toBeLessThan(1e-4);
     const box = new Box3().setFromBufferAttribute(a.mesh.geometry.getAttribute('position') as never);
     expect(box.max.y - box.min.y).toBeGreaterThan(0.6);
+  });
+});
+
+describe("women's V-neck (baked FBX2glTF conversion)", () => {
+  it('loads in the same layout as the male model: metres, +Y up, A-pose, exact rest pose', async () => {
+    const { stats, rig } = await loadVneckFemale();
+    expect(stats.triangles).toBe(14007);
+    expect(stats.restError).toBeLessThan(1e-4);
+    // Narrower than the male shirt (0.38 m), at a plausible shoulder height.
+    expect(rig.shoulderSpan).toBeCloseTo(0.354, 2);
+    expect(rig.shoulderMid.y).toBeGreaterThan(1.2);
+    expect(rig.shoulderMid.y).toBeLessThan(1.45);
+    const l = rig.bones[rig.roles.upperArm.left]?.bindPosition as Vector3;
+    expect(l.x).toBeGreaterThan(0.15);
+    expect(rig.restAim.upperArm.left.y).toBeLessThan(-0.5);
+    expect(rig.restAim.upperArm.right.x).toBeLessThan(-0.3);
   });
 });

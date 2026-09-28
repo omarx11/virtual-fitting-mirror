@@ -157,7 +157,6 @@ export function GarmentPicker({
           </button>
         </p>
       )}
-      <p className="hint">{selected?.kind === '3d' ? m.garments.hint3d : m.garments.hint2d}</p>
     </fieldset>
   );
 }

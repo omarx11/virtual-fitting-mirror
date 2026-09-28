@@ -26,6 +26,15 @@ export const AI_PROVIDER_RETENTION_URL = 'https://docs.fashn.ai/api-overview/dat
 /** Header every browser call must carry (a same-origin marker; cross-site forms cannot set it). */
 export const AI_CLIENT_HEADER = 'x-vfm-ai';
 
+/**
+ * Header carrying a visitor's own FASHN API key (saved in their browser). The server uses it for that
+ * visitor's generations only and never stores or logs it; job records keep a hash to match status reads.
+ */
+export const AI_USER_KEY_HEADER = 'x-fashn-key';
+
+/** Accepted shape of a visitor's API key: printable ASCII without spaces. */
+export const AI_USER_KEY_PATTERN = /^[!-~]{8,256}$/;
+
 export interface AiPresetInfo {
   id: AiPresetId;
   label: string;
@@ -53,6 +62,11 @@ export interface AiCapabilities {
    * one, `granted` when this browser has entered it (an HttpOnly cookie the page cannot read).
    */
   access: { required: boolean; granted: boolean };
+  /**
+   * Which API keys can pay for a generation: `server` when the operator's key is usable (behind the
+   * access code, if any), `user` when visitors may bring their own FASHN key instead.
+   */
+  keys: { server: boolean; user: boolean };
   limits: { maxUploadBytes: number; maxInputPixels: number };
   localResultTtlSeconds: number;
   jobDeadlineSeconds: number;
@@ -89,6 +103,7 @@ export type AiErrorCode =
   | 'forbidden'
   | 'access-required'
   | 'access-denied'
+  | 'key-required'
   | 'pose'
   | 'moderation'
   | 'image-load'
@@ -124,6 +139,11 @@ export interface AiJobView {
 export interface AiSessionView {
   expiresAt: number;
   idleTimeoutSeconds: number;
+}
+
+/** Result of checking a visitor's own API key: its FASHN credit balance (null for the test provider). */
+export interface AiKeyCheck {
+  credits: number | null;
 }
 
 /** One UTC day of AI usage, from the server's local ledger (counts only, never images). */

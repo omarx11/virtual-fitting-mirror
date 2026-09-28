@@ -84,7 +84,13 @@ describe('Vercel configuration', () => {
     expect(vercelConfig({ KV_REST_API_URL: '', KV_REST_API_TOKEN: '' }).ai.unavailableReason).toMatch(
       /Redis/,
     );
-    expect(vercelConfig({ AI_ACCESS_CODE: '' }).ai.unavailableReason).toMatch(/AI_ACCESS_CODE/);
+    // Without an access code the operator's key is off limits; visitors can still use their own.
+    const open = vercelConfig({ AI_ACCESS_CODE: '' }).ai;
+    expect(open.serverKeyReason).toMatch(/AI_ACCESS_CODE/);
+    expect(open.unavailableReason).toBeNull();
+    expect(vercelConfig({ AI_ACCESS_CODE: '', AI_USER_KEYS: 'false' }).ai.unavailableReason).toMatch(
+      /AI_ACCESS_CODE/,
+    );
     expect(vercelConfig().ai.unavailableReason).toBeNull();
     expect(() => vercelConfig({ AI_ACCESS_CODE: 'short' })).toThrow(ConfigError);
     expect(() => vercelConfig({ AI_STORE: 'memory' })).toThrow(ConfigError);

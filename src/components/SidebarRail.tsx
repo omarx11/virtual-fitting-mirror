@@ -1,12 +1,4 @@
-import {
-  ChevronUp,
-  Expand,
-  FlipHorizontal2,
-  Keyboard,
-  Minimize,
-  PanelLeftOpen,
-  PanelRightOpen,
-} from 'lucide-react';
+import { ChevronUp, Expand, FlipHorizontal2, Keyboard, Minimize, PanelRightOpen } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BRAND } from '../app/brand';
 import type { TryOnMode } from '../app/preferences';
@@ -42,9 +34,8 @@ export function SidebarRail({
   onShortcuts: () => void;
   onAbout: () => void;
 }) {
-  const { m, rtl } = useI18n();
+  const { m } = useI18n();
   const expandLabel = narrow ? m.app.showAllControls : m.app.unfoldSidebar;
-  const UnfoldIcon = rtl ? PanelLeftOpen : PanelRightOpen;
   return (
     <motion.div
       className="rail"
@@ -61,7 +52,7 @@ export function SidebarRail({
         aria-expanded={false}
         title={withKey(expandLabel, 'S')}
       >
-        {narrow ? <ChevronUp aria-hidden size={20} /> : <UnfoldIcon aria-hidden size={20} />}
+        {narrow ? <ChevronUp aria-hidden size={20} /> : <PanelRightOpen aria-hidden size={20} />}
       </button>
       <TryOnModeSelector mode={mode} onChange={onMode} compact />
       <div className="rail-tools">

@@ -8,7 +8,8 @@
  *   - every call carries the X-VFM-AI header, which a cross-site form or <img> cannot add, and no
  *     CORS headers are ever sent, so other sites cannot read or write this API;
  *   - when an access code is configured (always on Vercel), starting a session, a job or reading
- *     usage needs the signed access cookie (see access.ts);
+ *     usage needs the signed access cookie (see access.ts) — unless the request carries the visitor's
+ *     own API key (X-FASHN-Key), which then pays instead of the operator's and is never stored;
  *   - jobs belong to an ephemeral session (HttpOnly SameSite=Strict cookie) and are checked on
  *     every read, result download and deletion. Job IDs alone are not permission, and provider
  *     prediction IDs are never accepted from or shown to the client.
@@ -20,9 +21,12 @@ import {
   AI_CLIENT_HEADER,
   AI_CONSENT_VERSION,
   AI_PROVIDER_RETENTION_URL,
+  AI_USER_KEY_HEADER,
+  AI_USER_KEY_PATTERN,
   type AiCapabilities,
   type AiGarmentCategory,
   type AiGarmentPhotoType,
+  type AiKeyCheck,
   type AiPresetId,
   type AiSessionView,
   type AiUsageView,
@@ -32,10 +36,10 @@ import { type AccessGate, accessCookie } from './access';
 import type { CatalogueStore } from './catalogue';
 import { AppError } from './errors';
 import { type ImageLimits, type NormalizedImage, normalizeImage } from './images';
-import type { JobManager } from './jobs';
+import type { JobManager, UserKey } from './jobs';
 import type { UsageLedger } from './ledger';
 import { presetInfo } from './presets';
-import type { ProviderBalance, TryOnProvider } from './providers/types';
+import { type ProviderBalance, ProviderBalanceError, type TryOnProvider } from './providers/types';
 import {
   clearedSessionCookie,
   readCookie,
@@ -53,6 +57,8 @@ export interface AiServices {
   ledger: UsageLedger;
   access: AccessGate;
   provider: TryOnProvider;
+  /** Provider paid by a visitor's own API key. */
+  userProvider: (apiKey: string) => TryOnProvider;
   providerName: 'fashn' | 'fake';
 }
 
@@ -61,8 +67,15 @@ const JOB_ID = /^[A-Za-z0-9_-]{24}$/;
 const CATEGORIES: readonly AiGarmentCategory[] = ['tops', 'bottoms', 'one-pieces'];
 const PHOTO_TYPES: readonly AiGarmentPhotoType[] = ['flat-lay', 'model', 'auto'];
 
+/** Why the operator's key cannot pay for a generation, or null when it can. */
+export function serverKeyReason(s: AiServices): string | null {
+  return s.config.ai.serverKeyReason ?? s.ledger.loadError;
+}
+
+/** Why AI cannot run at all (not even with a visitor's own key), or null when it can. */
 export function unavailableReason(s: AiServices): string | null {
-  return s.config.ai.unavailableReason ?? s.ledger.loadError;
+  const { ai } = s.config;
+  return ai.unavailableReason ?? (ai.userKeys ? null : serverKeyReason(s));
 }
 
 export function capabilities(s: AiServices, cookieHeader?: string): AiCapabilities {
@@ -78,6 +91,7 @@ export function capabilities(s: AiServices, cookieHeader?: string): AiCapabiliti
     consentVersion: AI_CONSENT_VERSION,
     devUploads: ai.devUploads,
     access: { required: s.access.required, granted: s.access.granted(cookieHeader) },
+    keys: { server: reason === null && serverKeyReason(s) === null, user: reason === null && ai.userKeys },
     limits: { maxUploadBytes: ai.maxUploadBytes, maxInputPixels: ai.maxInputPixels },
     localResultTtlSeconds: ai.resultTtlSeconds,
     jobDeadlineSeconds: ai.jobDeadlineSeconds,
@@ -120,6 +134,23 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
   app.addHook('onRequest', async (req, reply) => {
     reply.header('cache-control', 'no-store');
     checkRequestOrigin(req, origins, hosts, s.config.sameOriginHosts);
+  });
+
+  /** The visitor's own API key sent with this request, or null. Validated, never stored or logged. */
+  const keyOf = (req: FastifyRequest): string | null => {
+    const raw = req.headers[AI_USER_KEY_HEADER];
+    if (raw === undefined) return null;
+    if (!ai.userKeys) {
+      throw new AppError('bad-request', 400, 'Personal API keys are not accepted on this server.');
+    }
+    if (typeof raw !== 'string' || !AI_USER_KEY_PATTERN.test(raw)) {
+      throw new AppError('bad-request', 400, 'That API key is not valid.');
+    }
+    return raw;
+  };
+  const userKey = (key: string): UserKey => ({
+    provider: s.userProvider(key),
+    hash: createHash('sha256').update(`vfm-user-key\n${key}`).digest('base64url'),
   });
 
   const requireSession = async (req: FastifyRequest): Promise<Session> => {
@@ -194,9 +225,28 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     return view;
   });
 
+  // Checks a visitor's own API key before the page saves it: answers with the account's balance.
+  app.get('/key', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    if (unavailableReason(s)) throw new AppError('not-configured', 503, 'AI preview is not available.');
+    const key = keyOf(req);
+    if (!key) throw new AppError('key-required', 400, 'No API key was sent.');
+    const provider = s.userProvider(key);
+    if (!provider.balance) return { credits: null } satisfies AiKeyCheck;
+    try {
+      const balance = await provider.balance(AbortSignal.timeout(10_000));
+      return { credits: balance.total } satisfies AiKeyCheck;
+    } catch (error) {
+      const status = error instanceof ProviderBalanceError ? error.status : null;
+      if (status === 401 || status === 403) {
+        throw new AppError('provider-auth', 403, 'FASHN did not accept this API key.');
+      }
+      throw new AppError('provider-failed', 502, 'Could not reach FASHN to check the key. Try again.');
+    }
+  });
+
   // A new session always replaces (and purges) the caller's previous one: a new customer.
   app.post('/session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
-    s.access.require(req.headers.cookie);
+    if (!keyOf(req)) s.access.require(req.headers.cookie);
     await endSession(req);
     const session = await s.sessions.create();
     reply.header('set-cookie', sessionCookie(session.id, secure(req)));
@@ -214,7 +264,17 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (req: FastifyRequest, reply: FastifyReply) => {
       if (unavailableReason(s)) throw new AppError('not-configured', 503, 'AI preview is not available.');
-      s.access.require(req.headers.cookie);
+      const key = keyOf(req);
+      if (!key) {
+        if (serverKeyReason(s)) {
+          throw new AppError(
+            'key-required',
+            403,
+            'Add your FASHN API key in the AI panel to generate a preview.',
+          );
+        }
+        s.access.require(req.headers.cookie);
+      }
       const session = await requireSession(req);
       if (!req.isMultipart()) throw new AppError('bad-request', 415, 'Expected a multipart upload.');
 
@@ -295,12 +355,16 @@ export async function aiRoutes(app: FastifyInstance, s: AiServices): Promise<voi
         product,
         category,
         photoType,
+        userKey: key ? userKey(key) : null,
       });
       return reply.code(202).send(job);
     },
   );
 
-  app.get('/jobs/:id', lenient, async (req) => s.jobs.view(jobId(req), (await requireSession(req)).id));
+  app.get('/jobs/:id', lenient, async (req) => {
+    const key = keyOf(req);
+    return s.jobs.view(jobId(req), (await requireSession(req)).id, key ? userKey(key) : null);
+  });
 
   app.get('/jobs/:id/result', lenient, async (req, reply) => {
     const image = await s.jobs.result(jobId(req), (await requireSession(req)).id);

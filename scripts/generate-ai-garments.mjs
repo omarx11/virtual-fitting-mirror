@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Generates the DEMO product photos used by AI mode (public/garments/ai/<id>/product.jpg + preview.jpg).
-// They are synthetic stand-ins, not shop photography:
-//   - vneck-*: rendered from the actual 3D V-neck model (neutral pose, one fabric colour each) via the
-//     development inspection view in Playwright's Chromium. The model has no fabric texture.
-//   - the 2D tees: rasterized from this project's own CC0 demo SVG artwork.
+// Generates the product photos used by AI mode (public/garments/ai/<id>/product.jpg + preview.jpg):
+//   - photos: real garments worn by models, from free-licence stock photos kept in
+//     assets/garments/ai/photos/ (sources and licences in assets/garments/ai/SOURCE.md);
+//   - vneck-*: DEMO renders of the actual 3D V-neck model (neutral pose, one fabric colour each) via
+//     the development inspection view in Playwright's Chromium. The model has no fabric texture.
 // Real shop products need real, owner-provided photos (see assets/garments/ai/SOURCE.md).
 //
 // Usage: npm run generate:ai-garments
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -45,11 +45,42 @@ async function writeProduct(id, input) {
   console.log(`[ai-garments] wrote ${id}`);
 }
 
-// 2D demo art (CC0): the composed preview SVG shows the body with both sleeves.
-for (const id of ['coral-crew-tee', 'breton-stripe-tee', 'chambray-button-shirt', 'forest-v-neck']) {
-  const svg = readFileSync(join(root, 'public', 'garments', id, 'preview.svg'));
-  await writeProduct(id, await sharp(svg, { density: 300 }).png().toBuffer());
+/**
+ * On-model stock photos. `keep` trims the photo to the garment being offered (fractions of the
+ * height, e.g. the fanila photo stops above the model's shorts); `focus` is the vertical centre of
+ * the square picker thumbnail, as a fraction of the kept height.
+ */
+const PHOTOS = [
+  { id: 'dress-green', focus: 0.47 },
+  { id: 'dress-purple', focus: 0.45 },
+  { id: 'thobe-white', focus: 0.5 },
+  { id: 'fanila-white', focus: 0.42, keep: [0, 0.66] },
+];
+const PHOTO_LONG_SIDE = 1400;
+
+for (const { id, focus, keep = [0, 1] } of PHOTOS) {
+  const source = join(root, 'assets', 'garments', 'ai', 'photos', `${id}.jpg`);
+  const { width, height } = await sharp(source).metadata();
+  const top = Math.round(height * keep[0]);
+  const kept = Math.round(height * (keep[1] - keep[0]));
+  const dir = join(outRoot, id);
+  mkdirSync(dir, { recursive: true });
+  const trimmed = await sharp(source).rotate().extract({ left: 0, top, width, height: kept }).toBuffer();
+  await sharp(trimmed)
+    .resize(PHOTO_LONG_SIDE, PHOTO_LONG_SIDE, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 88, mozjpeg: true })
+    .toFile(join(dir, 'product.jpg'));
+  // Square thumbnail across the garment: full width, centred on `focus`.
+  const side = Math.min(width, kept);
+  const y = Math.max(0, Math.min(kept - side, Math.round(kept * focus - side / 2)));
+  await sharp(trimmed)
+    .extract({ left: Math.round((width - side) / 2), top: y, width: side, height: side })
+    .resize(PREVIEW, PREVIEW)
+    .jpeg({ quality: 85, mozjpeg: true })
+    .toFile(join(dir, 'preview.jpg'));
+  console.log(`[ai-garments] wrote ${id}`);
 }
+if (process.argv.includes('--photos-only')) process.exit(0);
 
 // 3D V-neck renders from the actual model.
 const server = await createServer({ root, server: { port: 5182, strictPort: false }, logLevel: 'error' });

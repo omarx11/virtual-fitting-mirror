@@ -48,6 +48,15 @@ export const VNECK_RIG: GarmentRigConfig = {
   clavicleLift: { startDeg: 70, factor: 0.25, maxDeg: 22 },
 };
 
+/**
+ * Female source model (public/garments/3d/vneck/shirt-female.glb), converted from
+ * SM_Shirt_01_woman.fbx with FBX2glTF and baked to the same layout as the male GLB by
+ * scripts/bake-fbx-garment.mjs (metres, +Y up; rest-pose error < 0.1 mm). The skeleton uses the same
+ * bone names (88 joints in the skin, the same 19 carry weights), so the male bone mapping applies.
+ * Upper-arm heads sit at x = ±0.177 m, y = 1.319 m (shoulder span 0.354 m against 0.380 m).
+ */
+export const VNECK_FEMALE_RIG: GarmentRigConfig = VNECK_RIG;
+
 export const VNECK_SIMULATION: GarmentSimulationConfig = {
   // ≈1,000 particles on this mesh (0.03 m ⇒ 1,354; 0.04 m ⇒ 791).
   voxelSize: 0.035,

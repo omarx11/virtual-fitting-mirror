@@ -5,7 +5,6 @@ import {
   FlipHorizontal2,
   Info,
   Languages,
-  PanelLeftClose,
   PanelRightClose,
   PanelsTopLeft,
   Ruler,
@@ -77,7 +76,7 @@ export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appRef = useRef<HTMLDivElement>(null);
-  const { m, rtl, toggleLocale } = useI18n();
+  const { m, toggleLocale } = useI18n();
   const [prefs, setPrefs] = useState<Preferences>(loadPreferences);
   const { engine, snapshot, initError } = useMirrorEngine(canvasRef, stageRef, prefs);
   const [fullscreen, setFullscreen] = useState(false);
@@ -350,8 +349,6 @@ export function App() {
         : typeof captureError === 'string'
           ? m.ai.photoErrors[captureError]
           : captureError.message;
-  // The sidebar sits on the right in English and on the left in Arabic.
-  const FoldIcon = rtl ? PanelLeftClose : PanelRightClose;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -475,7 +472,11 @@ export function App() {
                         aria-expanded
                         title={withKey(narrow ? m.app.foldControls : m.app.foldSidebar, 'S')}
                       >
-                        {narrow ? <ChevronDown aria-hidden size={20} /> : <FoldIcon aria-hidden size={20} />}
+                        {narrow ? (
+                          <ChevronDown aria-hidden size={20} />
+                        ) : (
+                          <PanelRightClose aria-hidden size={20} />
+                        )}
                       </button>
                     </div>
                   </header>
@@ -629,8 +630,10 @@ export function App() {
                     <div className="privacy-note">
                       <ShieldCheck aria-hidden size={18} />
                       <p>
-                        {aiActive ? m.app.privacyAi : m.app.privacyLive}
-                        {m.app.privacyCommon}{' '}
+                        {aiActive ? m.app.privacyAi : m.app.privacyLive}{' '}
+                        <a className="text-button" href="/research">
+                          {m.app.learnMore}
+                        </a>{' '}
                         <button
                           type="button"
                           className="text-button keyboard-only"

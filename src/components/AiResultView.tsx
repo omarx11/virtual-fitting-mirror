@@ -141,6 +141,7 @@ export function AiResultView({
   // Changing the garment drops any result, so the current choice also names the shown result.
   const garmentLabel = aiChoiceLabel(m, state.garment);
   const errorText = error ? m.ai.error(error.code, error.message) : null;
+  const payment = controller.payment();
 
   if (phase === 'inactive') return null;
 
@@ -300,7 +301,13 @@ export function AiResultView({
               onClick={() => controller.requestGenerate()}
               disabled={active || phase === 'consent' || !controller.readyToGenerate()}
               title={
-                !controller.accessGranted() ? m.ai.accessFirst : garmentLabel ? undefined : m.ai.chooseFirst
+                payment === 'key'
+                  ? m.ai.keyFirst
+                  : payment === 'access'
+                    ? m.ai.accessFirst
+                    : garmentLabel
+                      ? undefined
+                      : m.ai.chooseFirst
               }
             >
               <Sparkles aria-hidden size={20} /> {phase === 'error' ? m.ai.generateAgain : m.ai.generate}
@@ -313,8 +320,10 @@ export function AiResultView({
           )}
         </div>
         {active && <p className="hint">{m.ai.retakeNote}</p>}
-        {!showResult && !active && !controller.accessGranted() && <p className="hint">{m.ai.accessFirst}.</p>}
-        {!showResult && !active && controller.accessGranted() && !garmentLabel && (
+        {!showResult && !active && payment !== 'ok' && (
+          <p className="hint">{payment === 'key' ? m.ai.keyFirst : m.ai.accessFirst}.</p>
+        )}
+        {!showResult && !active && payment === 'ok' && !garmentLabel && (
           <p className="hint">{m.ai.choosePanel}</p>
         )}
       </motion.div>

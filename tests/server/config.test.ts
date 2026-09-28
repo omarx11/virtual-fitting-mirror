@@ -5,12 +5,14 @@ import { ROOT } from './helpers';
 const load = (env: Record<string, string>, production = false) => loadConfig(env, { production, root: ROOT });
 
 describe('server configuration', () => {
-  it('is safe by default: AI off, loopback only, Max fast 1K, one job, daily cap', () => {
+  it('is safe by default: no operator key spent, loopback only, Max fast 1K, one job, daily cap', () => {
     const c = load({});
     expect(c.host).toBe('127.0.0.1');
     expect(c.port).toBe(3001);
-    expect(c.ai.switchedOn).toBe(false);
-    expect(c.ai.unavailableReason).toMatch(/AI_ENABLED/);
+    // On, but without FASHN_API_KEY only visitors' own keys can pay.
+    expect(c.ai.switchedOn).toBe(true);
+    expect(c.ai.serverKeyReason).toMatch(/FASHN_API_KEY/);
+    expect(load({ AI_ENABLED: 'false' }).ai.unavailableReason).toMatch(/AI_ENABLED/);
     expect(c.ai.defaultPreset).toBe('max-fast-1k');
     expect(c.ai.presets).toEqual(['max-fast-1k']);
     expect(c.ai.maxConcurrentJobs).toBe(1);
@@ -18,10 +20,16 @@ describe('server configuration', () => {
     expect(c.ai.resultTtlSeconds).toBe(120);
   });
 
-  it('reports a missing key without failing (2D/3D keep running)', () => {
+  it('reports a missing key without failing (2D/3D keep running, visitors may bring their own)', () => {
     const c = load({ AI_ENABLED: 'true' });
-    expect(c.ai.unavailableReason).toMatch(/FASHN_API_KEY/);
-    expect(load({ AI_ENABLED: 'true', FASHN_API_KEY: 'k' }).ai.unavailableReason).toBeNull();
+    expect(c.ai.userKeys).toBe(true);
+    expect(c.ai.unavailableReason).toBeNull();
+    expect(c.ai.serverKeyReason).toMatch(/FASHN_API_KEY/);
+    const kiosk = load({ AI_ENABLED: 'true', AI_USER_KEYS: 'false' });
+    expect(kiosk.ai.unavailableReason).toMatch(/FASHN_API_KEY/);
+    const keyed = load({ AI_ENABLED: 'true', FASHN_API_KEY: 'k' });
+    expect(keyed.ai.unavailableReason).toBeNull();
+    expect(keyed.ai.serverKeyReason).toBeNull();
   });
 
   it('disables the fake provider in production unless explicitly allowed', () => {

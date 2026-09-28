@@ -6,8 +6,9 @@
  * This module is plain data (no DOM, no Node): the backend imports it to resolve catalogue IDs to an
  * allowlisted image file, so the browser can never name an arbitrary path.
  *
- * Every current entry is a DEMO stand-in (see assets/garments/ai/SOURCE.md). Colour variants need
- * their own photo: changing a 3D material does not change an AI product photograph.
+ * The dresses, thobe and fanila are real garments worn by models in free-licence stock photos; the
+ * V-necks are DEMO renders of the 3D model (sources in assets/garments/ai/SOURCE.md). Colour variants
+ * need their own photo: changing a 3D material does not change an AI product photograph.
  */
 import type { AiGarmentCategory, AiGarmentPhotoType } from '../ai/types';
 
@@ -34,7 +35,10 @@ export interface AiGarmentDefinition {
 
 const RENDER_NOTE =
   'Synthetic render of the rigged 3D V-neck model (no fabric texture) — demo only, not a shop photo.';
-const ART_NOTE = 'Rasterized from this project’s own CC0 demo artwork — not a real product.';
+const PHOTO_NOTE = (site: string, photographer: string) =>
+  `Stock photo by ${photographer} (${site} licence) — a real garment, not a product sold here.`;
+
+type EntryOptions = Pick<AiGarmentDefinition, 'category' | 'photoType' | 'demo' | 'liveGarmentId'>;
 
 function entry(
   id: string,
@@ -43,7 +47,7 @@ function entry(
   label: string,
   description: string,
   provenance: string,
-  liveGarmentId: string | null,
+  options: EntryOptions,
 ): AiGarmentDefinition {
   return {
     id,
@@ -53,53 +57,67 @@ function entry(
     description,
     preview: `garments/ai/${id}/preview.jpg`,
     productImage: `garments/ai/${id}/product.jpg`,
-    category: 'tops',
-    photoType: 'flat-lay',
     provenance,
-    demo: true,
-    liveGarmentId,
+    ...options,
   };
 }
 
+/** A real garment worn by a model in a stock photo. */
+const ON_MODEL = { photoType: 'model', demo: false, liveGarmentId: null } as const;
+/** A render of the live 3D V-neck. */
+const VNECK = { category: 'tops', photoType: 'flat-lay', demo: true, liveGarmentId: 'vneck-3d' } as const;
+
 export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
-  entry('vneck-stone', 'vneck', 'stone', 'V-neck · Stone', 'Rolled-sleeve V-neck', RENDER_NOTE, 'vneck-3d'),
-  entry('vneck-navy', 'vneck', 'navy', 'V-neck · Navy', 'Rolled-sleeve V-neck', RENDER_NOTE, 'vneck-3d'),
   entry(
-    'coral-crew-tee',
-    'coral-crew-tee',
-    'coral',
-    'Coral crew tee',
-    'Crew-neck T-shirt',
-    ART_NOTE,
-    'coral-crew-tee',
+    'dress-green',
+    'dress-green',
+    'green',
+    'Green dress',
+    'Long-sleeve ruched midi dress',
+    PHOTO_NOTE('Pexels', 'Vika Kirillova'),
+    {
+      ...ON_MODEL,
+      category: 'one-pieces',
+    },
   ),
   entry(
-    'breton-stripe-tee',
-    'breton-stripe-tee',
-    'stripe',
-    'Breton stripe',
-    'Striped boat-neck top',
-    ART_NOTE,
-    'breton-stripe-tee',
+    'dress-purple',
+    'dress-purple',
+    'purple',
+    'Purple gown',
+    'Long gown with flared sleeves',
+    PHOTO_NOTE('Pexels', 'abubakar mamman'),
+    {
+      ...ON_MODEL,
+      category: 'one-pieces',
+    },
   ),
   entry(
-    'chambray-button-shirt',
-    'chambray-button-shirt',
-    'chambray',
-    'Chambray shirt',
-    'Short-sleeve button-up',
-    ART_NOTE,
-    'chambray-button-shirt',
+    'thobe-white',
+    'thobe',
+    'white',
+    'Saudi thobe',
+    'White men’s thobe',
+    PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
+    {
+      ...ON_MODEL,
+      category: 'one-pieces',
+    },
   ),
   entry(
-    'forest-v-neck',
-    'forest-v-neck',
-    'forest',
-    'Forest V-neck',
-    'V-neck T-shirt',
-    ART_NOTE,
-    'forest-v-neck',
+    'fanila-white',
+    'fanila',
+    'white',
+    'Fanila',
+    'White sleeveless undershirt',
+    PHOTO_NOTE('Pexels', 'Sharon Snider'),
+    {
+      ...ON_MODEL,
+      category: 'tops',
+    },
   ),
+  entry('vneck-stone', 'vneck', 'stone', 'V-neck · Stone', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),
+  entry('vneck-navy', 'vneck', 'navy', 'V-neck · Navy', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),
 ];
 
 export const DEFAULT_AI_GARMENT_ID = AI_GARMENTS[0]?.id ?? '';

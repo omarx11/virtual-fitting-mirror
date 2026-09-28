@@ -10,6 +10,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { Redis } from '@upstash/redis';
 import Fastify, { type FastifyError, type FastifyInstance, LogController } from 'fastify';
+import { AI_USER_KEY_HEADER } from '../src/ai/types';
 import { AccessGate } from './ai/access';
 import { CatalogueStore } from './ai/catalogue';
 import { AppError } from './ai/errors';
@@ -28,6 +29,8 @@ export const CONTENT_SECURITY_POLICY = "connect-src 'self' ws: wss: blob: data:"
 
 export interface AppOverrides {
   provider?: TryOnProvider;
+  /** Provider for a visitor's own API key (default: FASHN with that key; tests reuse `provider`). */
+  userProvider?: (apiKey: string) => TryOnProvider;
   ledger?: UsageLedger;
   /** Shared state store (tests pass one to simulate several instances sharing Redis). */
   kv?: KvStore;
@@ -56,12 +59,16 @@ export function createKv(config: ServerConfig, now?: () => number): KvStore {
   return new MemoryKv(now);
 }
 
-export function createProvider(config: ServerConfig, now?: () => number): TryOnProvider {
+export function createProvider(
+  config: ServerConfig,
+  now?: () => number,
+  apiKey = config.ai.apiKey,
+): TryOnProvider {
   const { ai } = config;
   if (ai.provider === 'fake') {
     return new FakeProvider({ scenario: ai.fakeScenario, stepMs: ai.fakeStepMs, ...(now ? { now } : {}) });
   }
-  return new FashnProvider({ apiKey: ai.apiKey ?? '', submitTimeoutMs: ai.submitTimeoutSeconds * 1000 });
+  return new FashnProvider({ apiKey: apiKey ?? '', submitTimeoutMs: ai.submitTimeoutSeconds * 1000 });
 }
 
 export interface BuiltApp {
@@ -76,7 +83,14 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
     logger:
       config.logLevel === 'silent'
         ? false
-        : { level: config.logLevel, redact: ['req.headers.cookie', 'req.headers.authorization'] },
+        : {
+            level: config.logLevel,
+            redact: [
+              'req.headers.cookie',
+              'req.headers.authorization',
+              `req.headers["${AI_USER_KEY_HEADER}"]`,
+            ],
+          },
     // Request bodies are never logged; only errors are, without payloads.
     logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: 64 * 1024,
@@ -84,6 +98,12 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
   });
 
   const provider = overrides.provider ?? createProvider(config, overrides.now);
+  // The offline test provider has no account: a visitor's key then reuses the same instance.
+  const userProvider =
+    overrides.userProvider ??
+    (overrides.provider || ai.provider === 'fake'
+      ? () => provider
+      : (apiKey: string) => createProvider(config, overrides.now, apiKey));
   const kv = overrides.kv ?? createKv(config, now);
   const ledger =
     overrides.ledger ??
@@ -109,6 +129,7 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
     }),
     ledger,
     provider,
+    userProvider,
     providerName: provider.name,
   };
 

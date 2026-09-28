@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeProvider } from '../../server/ai/providers/fake';
+import { ProviderBalanceError } from '../../server/ai/providers/types';
 import { type BuiltApp, buildApp } from '../../server/app';
 import type { ServerConfig } from '../../server/config';
+import { AI_USER_KEY_HEADER } from '../../src/ai/types';
 import {
   browserHeaders,
   HOST,
@@ -58,7 +60,12 @@ const person = async () => {
 
 describe('capabilities and configuration', () => {
   it('reports unconfigured AI without disclosing the key or calling the provider', async () => {
-    const config = testConfig({ AI_PROVIDER: 'fashn', FASHN_API_KEY: '', AI_ENABLED: 'true' });
+    const config = testConfig({
+      AI_PROVIDER: 'fashn',
+      FASHN_API_KEY: '',
+      AI_ENABLED: 'true',
+      AI_USER_KEYS: 'false',
+    });
     const { app, fake } = await start(config);
     const res = await app.inject({ url: '/api/ai/capabilities', headers: browserHeaders() });
     expect(res.statusCode).toBe(200);
@@ -83,6 +90,90 @@ describe('capabilities and configuration', () => {
     const res = await app.inject({ url: '/api/ai/capabilities', headers: browserHeaders() });
     expect(res.body).not.toContain('SECRET');
     expect(res.json().enabled).toBe(true);
+  });
+});
+
+describe("a visitor's own API key", () => {
+  const GOOD = 'fa-visitor-key-123';
+  /** No operator key; a visitor key pays through `fake`, and only GOOD passes the balance check. */
+  async function startWithoutServerKey(env: Record<string, string> = {}) {
+    const fake = new FakeProvider({ scenario: 'success', stepMs: 10 });
+    const refused = new FakeProvider({ scenario: 'success', stepMs: 10 });
+    Object.assign(fake, { balance: async () => ({ total: 7, subscription: 5, onDemand: 2 }) });
+    Object.assign(refused, {
+      balance: async () => {
+        throw new ProviderBalanceError(401, 'FASHN balance request failed (HTTP 401).');
+      },
+    });
+    const config = testConfig({ AI_PROVIDER: 'fashn', FASHN_API_KEY: '', ...env });
+    const built = await buildApp(config, {
+      provider: fake,
+      userProvider: (key) => (key === GOOD ? fake : refused),
+      sweepIntervalMs: 20,
+    });
+    apps.push(built);
+    return { ...built, fake };
+  }
+  const withKey = (cookie?: string, key = GOOD) => ({ ...browserHeaders(cookie), [AI_USER_KEY_HEADER]: key });
+
+  it('pays for jobs when the server has no key, and never counts against the daily cap', async () => {
+    const { app, fake, services } = await startWithoutServerKey();
+    const caps = (await app.inject({ url: '/api/ai/capabilities', headers: browserHeaders() })).json();
+    expect(caps).toMatchObject({ enabled: true, keys: { server: false, user: true } });
+
+    // Without a key nothing is sent to the provider.
+    const cookie = await newSession(app);
+    const refused = await postJob(app, cookie, jobParts(await person()));
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().error.code).toBe('key-required');
+    expect(fake.submitCount).toBe(0);
+
+    const body = multipart(jobParts(await person()));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/ai/jobs',
+      headers: { ...withKey(cookie), 'content-type': body.contentType },
+      payload: body.payload,
+    });
+    expect(res.statusCode).toBe(202);
+    const id = res.json().id as string;
+    await waitFor(
+      async () => (await app.inject({ url: `/api/ai/jobs/${id}`, headers: withKey(cookie) })).json().status,
+      (s) => s === 'completed',
+    );
+    expect(fake.submitCount).toBe(1);
+    expect((await services.ledger.today()).used).toBe(0);
+    // Only a hash of the key is kept with the job.
+    expect(JSON.stringify(res.json())).not.toContain(GOOD);
+  });
+
+  it('checks a key with the provider before the page saves it', async () => {
+    const { app } = await startWithoutServerKey();
+    const ok = await app.inject({ url: '/api/ai/key', headers: withKey() });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ credits: 7 });
+    const wrong = await app.inject({ url: '/api/ai/key', headers: withKey(undefined, 'fa-wrong-key-999') });
+    expect(wrong.statusCode).toBe(403);
+    expect(wrong.json().error.code).toBe('provider-auth');
+    const malformed = await app.inject({
+      url: '/api/ai/key',
+      headers: withKey(undefined, 'has space in it'),
+    });
+    expect(malformed.statusCode).toBe(400);
+  });
+
+  it('replaces the access code, and is refused where visitor keys are switched off', async () => {
+    const { app } = await startWithoutServerKey({ AI_ACCESS_CODE: 'staff-code-1' });
+    const denied = await app.inject({ method: 'POST', url: '/api/ai/session', headers: browserHeaders() });
+    expect(denied.json().error.code).toBe('access-required');
+    const allowed = await app.inject({ method: 'POST', url: '/api/ai/session', headers: withKey() });
+    expect(allowed.statusCode).toBe(200);
+
+    const { app: kiosk } = await start(testConfig({ AI_USER_KEYS: 'false' }));
+    const caps = (await kiosk.inject({ url: '/api/ai/capabilities', headers: browserHeaders() })).json();
+    expect(caps.keys).toEqual({ server: true, user: false });
+    const res = await kiosk.inject({ method: 'POST', url: '/api/ai/session', headers: withKey() });
+    expect(res.statusCode).toBe(400);
   });
 });
 

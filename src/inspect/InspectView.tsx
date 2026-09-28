@@ -13,7 +13,7 @@ import { Quaternion, Vector3 } from 'three';
 import type { SmoothedFit3D } from '../fitting/fit3d';
 import { DEFAULT_USER_FIT } from '../fitting/garmentFit';
 import { type BodyPose3D, neutralPose } from '../fitting/retargeter';
-import { findMaterial, VNECK_3D } from '../garments/catalogue';
+import { findGarment, findMaterial, isGarment3D, VNECK_3D } from '../garments/catalogue';
 import { GarmentModelCache, type PreparedGarmentModel } from '../garments/modelLoader';
 import type { RigModel } from '../garments/rigModel';
 import { GarmentRenderer } from '../rendering/three/GarmentRenderer';
@@ -106,6 +106,12 @@ export function inspectPose(rig: RigModel, name: PoseName): BodyPose3D {
   return p;
 }
 
+/** `&garment=<id>` picks which 3D garment to inspect (default: the V-neck). */
+const GARMENT = (() => {
+  const g = findGarment(new URLSearchParams(location.search).get('garment'));
+  return isGarment3D(g) ? g : VNECK_3D;
+})();
+
 /** A fit that places the garment's shoulder midpoint at (cx, cy) with `pxPerMetre` scale. */
 function syntheticFit(
   model: PreparedGarmentModel,
@@ -118,7 +124,7 @@ function syntheticFit(
     anchor: { x: cx, y: cy },
     down: { x: 0, y: 1 },
     pxPerMetre,
-    bodyShoulderM: model.rig.shoulderSpan / VNECK_3D.rig.fit.shoulderWidthScale,
+    bodyShoulderM: model.rig.shoulderSpan / GARMENT.rig.fit.shoulderWidthScale,
     pose,
     yawDeg: 0,
     confidence: 1,
@@ -134,7 +140,7 @@ export function InspectView() {
   const [helpers, setHelpers] = useState(true);
   // `&material=<id>` lets the asset scripts render each fabric colour from the actual model.
   const [material, setMaterial] = useState(
-    () => findMaterial(VNECK_3D, new URLSearchParams(location.search).get('material')).id,
+    () => findMaterial(GARMENT, new URLSearchParams(location.search).get('material')).id,
   );
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<PreparedGarmentModel['stats'] | null>(null);
@@ -153,13 +159,13 @@ export function InspectView() {
     }
     const r = renderer;
     cache
-      .load(`${import.meta.env.BASE_URL}${VNECK_3D.model}`, VNECK_3D.rig)
+      .load(`${import.meta.env.BASE_URL}${GARMENT.model}`, GARMENT.rig)
       .then((model) => {
         if (cancelled) return;
         r.setGarment(
-          VNECK_3D,
+          GARMENT,
           model,
-          findMaterial(VNECK_3D, new URLSearchParams(location.search).get('material')),
+          findMaterial(GARMENT, new URLSearchParams(location.search).get('material')),
         );
         state.current = { renderer: r, model };
         setStats(model.stats);
@@ -179,7 +185,7 @@ export function InspectView() {
     const canvas = canvasRef.current;
     if (!s || !canvas) return;
     s.renderer.setDebugHelpers(helpers && !thumbnail);
-    s.renderer.setMaterial(findMaterial(VNECK_3D, material));
+    s.renderer.setMaterial(findMaterial(GARMENT, material));
     const ppm = thumbnail ? 1150 : 900;
     const cy = thumbnail ? 130 : 260;
     const result = s.renderer.render({
@@ -240,7 +246,7 @@ export function InspectView() {
           <label className="inline-select">
             <span>Fabric</span>
             <select value={material} onChange={(e) => setMaterial(e.target.value)}>
-              {VNECK_3D.materials.map((m) => (
+              {GARMENT.materials.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
                 </option>

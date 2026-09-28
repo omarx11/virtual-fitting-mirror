@@ -10,21 +10,27 @@
  * asks the backend to abandon the job — so a late result can never appear over live mode or the
  * next customer's screen.
  *
+ * Who pays: the operator's key (behind the access code on public deployments) or the visitor's own
+ * FASHN key, saved in their browser (`saveUserKey`). A saved key is checked with the provider first,
+ * and is sent only while the server accepts visitor keys.
+ *
  * Network loss while polling never starts a replacement job. After a submission whose outcome is
  * unknown (connection lost), the next explicit Generate reuses the SAME request ID, so the backend
  * deduplicates it instead of charging twice.
  */
 import type { CapturedImage } from './capture';
 import { AiApiError, type AiClient } from './client';
-import type {
-  AiCapabilities,
-  AiErrorCode,
-  AiGarmentCategory,
-  AiGarmentPhotoType,
-  AiJobStatus,
-  AiJobView,
-  AiPresetId,
+import {
+  AI_USER_KEY_PATTERN,
+  type AiCapabilities,
+  type AiErrorCode,
+  type AiGarmentCategory,
+  type AiGarmentPhotoType,
+  type AiJobStatus,
+  type AiJobView,
+  type AiPresetId,
 } from './types';
+import { createMemoryKeyStore, type UserKeyStore } from './userKey';
 
 export type AiPhase =
   | 'inactive'
@@ -79,7 +85,17 @@ export interface AiViewState {
   notice: string | null;
   /** Access-code entry on public deployments (see `unlock`). */
   access: { unlocking: boolean; error: { code: AiErrorCode | 'network'; message: string } | null };
+  /** The visitor's own API key: saved (and used), being checked, its balance when known. */
+  userKey: {
+    saved: boolean;
+    checking: boolean;
+    credits: number | null;
+    error: { code: AiErrorCode | 'network'; message: string } | null;
+  };
 }
+
+/** What still stands between the shopper and Generate: nothing, their own key, or the access code. */
+export type AiPayment = 'ok' | 'key' | 'access';
 
 export interface AiControllerDeps {
   client: AiClient;
@@ -89,6 +105,8 @@ export interface AiControllerDeps {
   createObjectURL: (blob: Blob) => string;
   revokeObjectURL: (url: string) => void;
   randomUUID: () => string;
+  /** Where the visitor's own API key is kept (default: memory only). */
+  keyStore?: UserKeyStore;
   /** Client-side idle reset of a customer's AI data (the server enforces its own timeout). */
   idleResetMs?: number;
   /** False for a build without the AI server: AI mode explains itself and never calls the API. */
@@ -111,6 +129,7 @@ export const INITIAL_AI_STATE: AiViewState = {
   error: null,
   notice: null,
   access: { unlocking: false, error: null },
+  userKey: { saved: false, checking: false, credits: null, error: null },
 };
 
 export class AiTryOnController {
@@ -132,8 +151,11 @@ export class AiTryOnController {
   private idleTimer: unknown = null;
   /** Request ID to reuse after a submission with unknown outcome, bound to the same inputs. */
   private retryRequest: { id: string; key: string } | null = null;
+  private readonly keys: UserKeyStore;
 
-  constructor(private readonly deps: AiControllerDeps) {}
+  constructor(private readonly deps: AiControllerDeps) {
+    this.keys = deps.keyStore ?? createMemoryKeyStore();
+  }
 
   getState(): AiViewState {
     return this.state;
@@ -172,6 +194,9 @@ export class AiTryOnController {
     try {
       const caps = await this.deps.client.capabilities();
       if (epoch !== this.epoch || this.disposed) return;
+      // A saved key is sent only while this server accepts visitor keys.
+      const key = caps.enabled && caps.keys.user ? this.keys.get() : null;
+      this.deps.client.setUserKey(key);
       if (!caps.enabled) {
         this.set({
           phase: 'unconfigured',
@@ -180,7 +205,13 @@ export class AiTryOnController {
         });
         return;
       }
-      this.set({ phase: 'ready', capabilities: caps, unavailable: null, preset: caps.defaultPreset });
+      this.set({
+        phase: 'ready',
+        capabilities: caps,
+        unavailable: null,
+        preset: caps.defaultPreset,
+        userKey: { ...INITIAL_AI_STATE.userKey, saved: key !== null },
+      });
     } catch (error) {
       if (epoch !== this.epoch || this.disposed) return;
       const down = error instanceof AiApiError && error.code === 'network';
@@ -333,15 +364,52 @@ export class AiTryOnController {
       s.capture !== null &&
       s.garment !== null &&
       s.capabilities?.enabled === true &&
-      this.accessGranted() &&
+      this.payment() === 'ok' &&
       s.preset !== null
     );
   }
 
-  /** False while a public deployment still needs its access code from this browser. */
-  accessGranted(): boolean {
-    const access = this.state.capabilities?.access;
-    return !access?.required || access.granted;
+  /**
+   * Whether a generation can be paid for: with the visitor's saved key, or the operator's key once any
+   * access code was entered. Otherwise names what is missing.
+   */
+  payment(): AiPayment {
+    const caps = this.state.capabilities;
+    if (!caps || this.state.userKey.saved) return 'ok';
+    if (!caps.keys.server) return 'key';
+    return caps.access.required && !caps.access.granted ? 'access' : 'ok';
+  }
+
+  /**
+   * Checks the visitor's own API key with the provider, then saves it in this browser and uses it for
+   * every later generation. False (with `userKey.error` set) when it is refused.
+   */
+  async saveUserKey(raw: string): Promise<boolean> {
+    const key = raw.trim();
+    if (!this.state.capabilities?.keys.user || this.state.userKey.checking || this.disposed) return false;
+    if (!AI_USER_KEY_PATTERN.test(key)) return false;
+    this.set({ userKey: { ...this.state.userKey, checking: true, error: null } });
+    try {
+      const check = await this.deps.client.checkKey(key);
+      if (this.disposed) return false;
+      this.keys.set(key);
+      this.deps.client.setUserKey(key);
+      this.set({ userKey: { saved: true, checking: false, credits: check.credits, error: null } });
+      return true;
+    } catch (error) {
+      const e = toApiError(error);
+      this.set({
+        userKey: { ...this.state.userKey, checking: false, error: { code: e.code, message: e.message } },
+      });
+      return false;
+    }
+  }
+
+  /** Removes the visitor's key from this browser; the operator's key (if any) pays again. */
+  forgetUserKey(): void {
+    this.keys.set(null);
+    this.deps.client.setUserKey(null);
+    this.set({ userKey: INITIAL_AI_STATE.userKey });
   }
 
   /**
@@ -628,6 +696,8 @@ export class AiTryOnController {
       capabilities: phase === 'inactive' ? null : this.state.capabilities,
       unavailable: phase === 'unconfigured' ? this.state.unavailable : null,
       preset: phase === 'inactive' ? null : this.state.preset,
+      // The saved key belongs to this browser, not to one customer session.
+      userKey: phase === 'inactive' ? INITIAL_AI_STATE.userKey : this.state.userKey,
       // A catalogue choice is not personal data; uploads are dropped.
       garment: g?.kind === 'catalogue' ? g : null,
     });

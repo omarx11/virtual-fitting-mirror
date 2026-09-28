@@ -36,7 +36,8 @@ export type ShortcutId =
 
 const RENDER_NOTE =
   'Synthetic render of the rigged 3D V-neck model (no fabric texture) — demo only, not a shop photo.';
-const ART_NOTE = 'Rasterized from this project’s own CC0 demo artwork — not a real product.';
+const PHOTO_NOTE = (site: string, photographer: string) =>
+  `Stock photo by ${photographer} (${site} licence) — a real garment, not a product sold here.`;
 
 export const en = {
   meta: {
@@ -97,11 +98,9 @@ export const en = {
     },
     live: 'Live',
     video: 'Video',
-    privacyAi: 'AI mode: a captured photo is uploaded to the cloud service FASHN only after you agree. ',
-    privacyLive:
-      'Approximate visual preview — not a size or fit measurement, and your own clothing may show at the edges. ',
-    privacyCommon:
-      '2D and 3D video stays on this device; the page only talks to the site it was loaded from, and every other outgoing request (including MediaPipe usage metrics) is blocked.',
+    privacyAi: 'Your photo is uploaded only after you agree.',
+    privacyLive: 'Your video stays on this device.',
+    learnMore: 'Learn more',
   },
   modes: {
     label: 'Try-on mode',
@@ -146,6 +145,7 @@ export const en = {
   welcome: {
     title: { pre: 'Virtual ', accent: 'fitting mirror', post: '' } as AccentText,
     lead: 'Try on shirts live in 2D or 3D, or create an AI photo preview.',
+    research: 'How it works: research & testing',
     steps: [
       { title: 'Pick a source', text: 'Webcam or video' },
       { title: 'Face the camera', text: 'Shoulders in view' },
@@ -236,11 +236,13 @@ export const en = {
     unavailable3dFallback: (message: string) =>
       `3D unavailable (${message}). Showing a flat 2D fallback image — not 3D.`,
     imageError: (message: string) => message,
-    hint3d: 'Neutral fabric colours; the model has no matching fabric texture yet.',
-    hint2d: 'Flat demo artwork (legacy 2D comparison).',
     /** Catalogue text by garment (or picker card) ID. Unknown IDs fall back to the catalogue's own. */
     items: {
       'vneck-3d': { name: 'V-neck (3D)', description: 'V-neck shirt with rolled sleeves — rigged 3D model' },
+      'vneck-women-3d': {
+        name: 'V-neck women (3D)',
+        description: 'Women’s V-neck with rolled sleeves — rigged 3D model',
+      },
       'shirt-2d': {
         name: 'Shirt (2D)',
         description: 'Flat demo artwork in several colours (legacy 2D comparison)',
@@ -261,22 +263,33 @@ export const en = {
     materials: { stone: 'Stone', navy: 'Navy', olive: 'Olive', white: 'White' } as Record<string, string>,
   },
   ai: {
-    panelLead:
-      'Take a photo, choose a garment and generate one still image. This is not live, and not a size or fit guide: colours, logos and details may differ from the real product.',
+    panelLead: 'Take a photo, pick a garment, and get an AI preview.',
     unavailableTitle: 'AI preview is unavailable.',
     accessTitle: 'Access code',
-    accessHint:
-      'This online demo protects paid AI previews with an access code. Enter the code you were given; this browser then stays unlocked for a few hours.',
+    accessHint: 'Enter the code you were given to use AI previews.',
     accessPlaceholder: 'Access code',
     accessUnlock: 'Unlock',
     accessUnlocking: 'Checking…',
     accessGranted: 'Access code accepted on this browser.',
     accessFirst: 'Enter the access code in the panel first',
+    keyFirst: 'Add your FASHN API key in the panel first',
+    key: {
+      title: 'Your FASHN API key',
+      optional: 'Use your own FASHN API key',
+      hint: 'Saved only in this browser.',
+      getKey: 'Get a key',
+      placeholder: 'API key',
+      save: 'Save',
+      checking: 'Checking…',
+      saved: 'Using your API key',
+      credits: (n: number) => `${n} credits left`,
+      remove: 'Remove',
+    },
     unavailableReason: (reason: string, _cause: AiUnavailableCause) => reason,
     setup: 'Setup (staff)',
     setupSteps: [
       'Copy `.env.example` to `.env` in the project folder.',
-      'On this computer, set `FASHN_API_KEY` to your FASHN API key and `AI_ENABLED=true`. Never put the key in a `VITE_` variable.',
+      'On this computer, set `AI_ENABLED=true`, and `FASHN_API_KEY` to your FASHN API key (or leave it empty: visitors then add their own key in this panel). Never put the key in a `VITE_` variable.',
       'Restart with `npm run dev` (or `npm run build` then `npm start`).',
     ],
     setupKeepsWorking: '2D and 3D keep working without it.',
@@ -293,8 +306,6 @@ export const en = {
     photoTypes: { auto: 'Auto', 'flat-lay': 'Flat-lay / ghost', model: 'On model' },
     uploadGarment: 'Upload a garment photo',
     devHint: 'Test inputs only; uploads are validated by the server and never stored.',
-    footnote:
-      'AI mode is the only feature that uploads anything: the photo goes to the cloud service FASHN, only after you agree. 2D and 3D stay on this device.',
     photoErrors: {
       type: 'Choose a JPEG, PNG or WebP photo.',
       size: 'That photo is too large.',
@@ -303,24 +314,32 @@ export const en = {
     },
     /** AI catalogue text by entry ID. */
     items: {
+      'dress-green': {
+        label: 'Green dress',
+        description: 'Long-sleeve ruched midi dress',
+        provenance: PHOTO_NOTE('Pexels', 'Vika Kirillova'),
+      },
+      'dress-purple': {
+        label: 'Purple gown',
+        description: 'Long gown with flared sleeves',
+        provenance: PHOTO_NOTE('Pexels', 'abubakar mamman'),
+      },
+      'thobe-white': {
+        label: 'Saudi thobe',
+        description: 'White men’s thobe',
+        provenance: PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
+      },
+      'fanila-white': {
+        label: 'Fanila',
+        description: 'White sleeveless undershirt',
+        provenance: PHOTO_NOTE('Pexels', 'Sharon Snider'),
+      },
       'vneck-stone': {
         label: 'V-neck · Stone',
         description: 'Rolled-sleeve V-neck',
         provenance: RENDER_NOTE,
       },
       'vneck-navy': { label: 'V-neck · Navy', description: 'Rolled-sleeve V-neck', provenance: RENDER_NOTE },
-      'coral-crew-tee': { label: 'Coral crew tee', description: 'Crew-neck T-shirt', provenance: ART_NOTE },
-      'breton-stripe-tee': {
-        label: 'Breton stripe',
-        description: 'Striped boat-neck top',
-        provenance: ART_NOTE,
-      },
-      'chambray-button-shirt': {
-        label: 'Chambray shirt',
-        description: 'Short-sleeve button-up',
-        provenance: ART_NOTE,
-      },
-      'forest-v-neck': { label: 'Forest V-neck', description: 'V-neck T-shirt', provenance: ART_NOTE },
     } as Record<string, { label: string; description: string; provenance: string }>,
 
     // Stage

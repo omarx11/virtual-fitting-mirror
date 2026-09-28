@@ -236,7 +236,7 @@ test.describe('AI photo flow (offline fake provider)', () => {
 
     await page
       .getByRole('radiogroup', { name: 'AI garment' })
-      .getByRole('radio', { name: /Breton stripe/ })
+      .getByRole('radio', { name: /Saudi thobe/ })
       .click();
     await page.getByRole('button', { name: 'Generate preview' }).click();
     const dialog = page.getByRole('dialog', { name: /Send your photo/ });
@@ -254,7 +254,7 @@ test.describe('AI photo flow (offline fake provider)', () => {
     await expect(page.getByTestId('ai-progress')).toContainText(/Uploading|queue|Generating/);
     await expect(page.getByTestId('ai-result')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('ai-label')).toContainText('AI-generated preview');
-    await expect(page.getByTestId('ai-label')).toContainText('Breton stripe');
+    await expect(page.getByTestId('ai-label')).toContainText('Saudi thobe');
     await expect(page.getByTestId('ai-label')).toContainText('TEST RESULT');
     await expect(page.getByTestId('ai-result')).toHaveClass(/mirrored/);
     expect(count(reqs, 'POST', /^\/api\/ai\/jobs$/)).toBe(1);
@@ -272,11 +272,11 @@ test.describe('AI photo flow (offline fake provider)', () => {
     await expect(page.getByTestId('ai-capture')).toHaveAttribute('src', captureSrc ?? '');
     await page
       .getByRole('radiogroup', { name: 'AI garment' })
-      .getByRole('radio', { name: /Forest V-neck/ })
+      .getByRole('radio', { name: /Green dress/ })
       .click();
     await page.getByRole('button', { name: 'Generate preview' }).dblclick();
     await expect(page.getByTestId('ai-result')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('ai-label')).toContainText('Forest V-neck');
+    await expect(page.getByTestId('ai-label')).toContainText('Green dress');
     expect(count(reqs, 'POST', /^\/api\/ai\/jobs$/)).toBe(2);
     expect(count(reqs, 'POST', /^\/api\/ai\/session$/)).toBe(1);
 
@@ -366,6 +366,8 @@ test.describe('AI availability', () => {
           defaultPreset: null,
           consentVersion: 'x',
           devUploads: false,
+          access: { required: false, granted: true },
+          keys: { server: false, user: false },
           limits: { maxUploadBytes: 1, maxInputPixels: 1 },
           localResultTtlSeconds: 120,
           jobDeadlineSeconds: 120,
@@ -417,5 +419,40 @@ test.describe('AI availability', () => {
     });
     expect(unknown.status()).toBe(404);
     expect(unknown.headers()['content-type']).toMatch(/application\/json/);
+  });
+
+  test("a visitor's own API key is checked, saved in the browser and sent with their jobs", async ({
+    page,
+  }) => {
+    const KEY = 'fa-visitor-key-123';
+    // As if the server had no key of its own (the test server accepts visitor keys).
+    await page.route('**/api/ai/capabilities', async (r) => {
+      const res = await r.fetch();
+      await r.fulfill({
+        response: res,
+        json: { ...(await res.json()), keys: { server: false, user: true } },
+      });
+    });
+    const sent: (string | undefined)[] = [];
+    page.on('request', (r) => {
+      if (/^\/api\/ai\/(session|jobs(\/[^/]+)?)$/.test(new URL(r.url()).pathname) && r.method() !== 'DELETE')
+        sent.push(r.headers()['x-fashn-key']);
+    });
+    await openAiWithVideo(page);
+    await page.getByRole('button', { name: 'Capture photo' }).click();
+    await expect(page.getByRole('button', { name: 'Generate preview' })).toBeDisabled();
+    await expect(page.getByText('Add your FASHN API key in the panel first')).toBeVisible();
+
+    const form = page.getByTestId('ai-key');
+    await form.getByLabel('Your FASHN API key').fill(KEY);
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('ai-key-saved')).toContainText('Using your API key');
+    expect(await page.evaluate(() => localStorage.getItem('virtual-fitting-mirror.fashn-key.v1'))).toBe(KEY);
+
+    await page.getByRole('button', { name: 'Generate preview' }).click();
+    await page.getByRole('button', { name: 'Agree & generate' }).click();
+    await expect(page.getByTestId('ai-result')).toBeVisible({ timeout: 20_000 });
+    expect(sent.length).toBeGreaterThan(2);
+    expect(sent.every((h) => h === KEY)).toBe(true);
   });
 });

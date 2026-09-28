@@ -99,7 +99,7 @@ export function jobParts(
   extra: Part[] = [],
 ): Part[] {
   const parts: Part[] = [{ name: 'person', value: person, filename: 'person.jpg' }];
-  const garmentId = overrides.garmentId === undefined ? 'coral-crew-tee' : overrides.garmentId;
+  const garmentId = overrides.garmentId === undefined ? 'dress-green' : overrides.garmentId;
   if (garmentId !== null) parts.push({ name: 'garmentId', value: garmentId });
   parts.push({ name: 'consentVersion', value: overrides.consentVersion ?? AI_CONSENT_VERSION });
   parts.push({ name: 'clientRequestId', value: overrides.clientRequestId ?? randomUUID() });

@@ -15,6 +15,7 @@ import Fashn, { APIConnectionError, APIError } from 'fashn';
 import type { ProviderRequest } from '../presets';
 import {
   type ProviderBalance,
+  ProviderBalanceError,
   type ProviderStatus,
   ProviderSubmitError,
   parseProviderStatus,
@@ -105,7 +106,9 @@ export class FashnProvider implements TryOnProvider {
       headers: { authorization: `Bearer ${this.options.apiKey}` },
       signal,
     });
-    if (!res.ok) throw new Error(`FASHN balance request failed (HTTP ${res.status}).`);
+    if (!res.ok) {
+      throw new ProviderBalanceError(res.status, `FASHN balance request failed (HTTP ${res.status}).`);
+    }
     const credits = ((await res.json()) as { credits?: Record<string, unknown> })?.credits;
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number.NaN);
     const balance = {
@@ -113,7 +116,9 @@ export class FashnProvider implements TryOnProvider {
       subscription: num(credits?.subscription),
       onDemand: num(credits?.on_demand),
     };
-    if (Object.values(balance).some(Number.isNaN)) throw new Error('Unexpected FASHN balance response.');
+    if (Object.values(balance).some(Number.isNaN)) {
+      throw new ProviderBalanceError(null, 'Unexpected FASHN balance response.');
+    }
     return balance;
   }
 }

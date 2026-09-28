@@ -14,7 +14,8 @@ import type { AccentText, Messages } from './en';
 
 const RENDER_NOTE =
   'صورة مولّدة من نموذج القميص ثلاثي الأبعاد (بدون نقشة القماش) — للعرض فقط، مو صورة منتج من المتجر.';
-const ART_NOTE = 'مأخوذة من رسومات تجريبية خاصة بالمشروع (CC0) — مو منتج حقيقي.';
+const PHOTO_NOTE = (site: string, photographer: string) =>
+  `صورة من ${site} للمصوّر ${photographer} — قطعة حقيقية، مو منتج نبيعه هنا.`;
 
 const TRACKER_ERRORS: Record<InitErrorKind, string> = {
   'model-missing': `ملف نموذج التتبّع غير موجود على هذا الجهاز. شغّل الأمر ${ltr('npm run setup:assets')} ثم أعد تحميل الصفحة.`,
@@ -58,11 +59,12 @@ const AI_ERRORS: Record<AiErrorCode | 'network', string> = {
   forbidden: 'هذا الطلب غير مسموح.',
   'access-required': 'أدخل رمز الدخول عشان تستخدم صورة الذكاء الاصطناعي.',
   'access-denied': 'رمز الدخول غير صحيح.',
+  'key-required': 'أضف مفتاح FASHN الخاص فيك في اللوحة عشان تولّد معاينة.',
   pose: 'ما قدرنا نشوفك بوضوح. خلّ وجهك للكاميرا والجزء العلوي من جسمك باين، وبعدين أعد التصوير.',
   moderation: 'الخدمة رفضت الصور في فحص سلامة المحتوى.',
   'image-load': 'الخدمة ما قدرت تقرأ الصور.',
-  'provider-auth': 'خدمة الذكاء الاصطناعي رفضت بيانات هذا الجهاز. اطلب المساعدة من الموظف.',
-  'provider-credits': 'رصيد حساب خدمة الذكاء الاصطناعي خلص. اطلب المساعدة من الموظف.',
+  'provider-auth': 'خدمة الذكاء الاصطناعي ما قبلت مفتاح API.',
+  'provider-credits': 'رصيد حساب FASHN المرتبط بالمفتاح خلص.',
   'provider-busy': 'خدمة الذكاء الاصطناعي مشغولة. جرّب بعد شوي.',
   'provider-failed': 'الخدمة ما قدرت تولّد معاينة هالمرة.',
   'provider-output': 'الخدمة رجّعت صورة ما تنفع.',
@@ -128,10 +130,9 @@ export const ar: Messages = {
     },
     live: 'مباشر',
     video: 'فيديو',
-    privacyAi: 'وضع الذكاء الاصطناعي: الصورة الملتقطة تنرفع لخدمة FASHN السحابية بس بعد موافقتك. ',
-    privacyLive: 'معاينة تقريبية للشكل — مو قياس للمقاس، وممكن تبان ملابسك من الأطراف. ',
-    privacyCommon:
-      'فيديو الوضعين 2D و3D يبقى على هذا الجهاز؛ الصفحة ما تتواصل إلا مع الموقع اللي انفتحت منه، وأي طلب ثاني يطلع للخارج (ومنها إحصائيات استخدام MediaPipe) محجوب.',
+    privacyAi: 'صورتك ما تنرفع إلا بعد موافقتك.',
+    privacyLive: 'الفيديو يبقى على هذا الجهاز.',
+    learnMore: 'اعرف أكثر',
   },
   modes: {
     label: 'وضع التجربة',
@@ -173,6 +174,7 @@ export const ar: Messages = {
   welcome: {
     title: { pre: 'مرآة ', accent: 'القياس', post: ' الافتراضية' } as AccentText,
     lead: 'جرّب القمصان مباشرة بـ 2D أو 3D، أو سوّ معاينة صورة بالذكاء الاصطناعي.',
+    research: 'كيف يشتغل: البحث والاختبار',
     steps: [
       { title: 'اختر المصدر', text: 'كاميرا أو فيديو' },
       { title: 'قابل الكاميرا', text: 'خلّ كتوفك باينة' },
@@ -263,10 +265,12 @@ export const ar: Messages = {
     unavailable3dFallback: (message) =>
       `العرض ثلاثي الأبعاد غير متاح (${message}). نعرض صورة مسطّحة بديلة — مو ثلاثية الأبعاد.`,
     imageError: (message) => `تعذّر تحميل صورة القميص (${message})`,
-    hint3d: 'ألوان قماش محايدة؛ النموذج ما له نقشة قماش مطابقة للحين.',
-    hint2d: 'رسومات تجريبية مسطّحة (للمقارنة مع وضع 2D القديم).',
     items: {
       'vneck-3d': { name: 'ياقة V ‏(3D)', description: 'قميص بياقة V وأكمام مرفوعة — نموذج ثلاثي الأبعاد' },
+      'vneck-women-3d': {
+        name: 'ياقة V نسائي ‏(3D)',
+        description: 'قميص نسائي بياقة V وأكمام مرفوعة — نموذج ثلاثي الأبعاد',
+      },
       'shirt-2d': { name: 'قميص (2D)', description: 'رسومات تجريبية مسطّحة بعدة ألوان (للمقارنة مع وضع 2D)' },
       'coral-crew-tee': { name: 'تيشيرت مرجاني', description: 'تيشيرت سادة بياقة دائرية', swatch: 'مرجاني' },
       'breton-stripe-tee': { name: 'مقلّم بريتون', description: 'بلوزة مقلّمة بياقة واسعة', swatch: 'مقلّم' },
@@ -280,17 +284,28 @@ export const ar: Messages = {
     materials: { stone: 'حجري', navy: 'كحلي', olive: 'زيتي', white: 'أبيض' },
   },
   ai: {
-    panelLead:
-      'التقط صورة، واختر قطعة، وولّد صورة ثابتة وحدة. هذا مو عرض مباشر ولا دليل مقاسات: الألوان والشعارات والتفاصيل ممكن تختلف عن المنتج الحقيقي.',
+    panelLead: 'التقط صورة، واختر قطعة، وخذ معاينة بالذكاء الاصطناعي.',
     unavailableTitle: 'معاينة الذكاء الاصطناعي غير متاحة.',
     accessTitle: 'رمز الدخول',
-    accessHint:
-      'هذي النسخة التجريبية على الإنترنت تحمي معاينات الذكاء الاصطناعي المدفوعة برمز دخول. أدخل الرمز اللي عطوك إياه، ويبقى هذا المتصفح مفتوح لكم ساعة.',
+    accessHint: 'أدخل الرمز اللي عطوك إياه عشان تستخدم معاينات الذكاء الاصطناعي.',
     accessPlaceholder: 'رمز الدخول',
     accessUnlock: 'افتح',
     accessUnlocking: 'جاري التحقق…',
     accessGranted: 'تم قبول رمز الدخول على هذا المتصفح.',
     accessFirst: 'أدخل رمز الدخول في اللوحة أول',
+    keyFirst: 'أضف مفتاح FASHN الخاص فيك في اللوحة أول',
+    key: {
+      title: 'مفتاح FASHN الخاص فيك',
+      optional: 'استخدم مفتاح FASHN الخاص فيك',
+      hint: 'ينحفظ في هذا المتصفح بس.',
+      getKey: 'احصل على مفتاح',
+      placeholder: 'مفتاح API',
+      save: 'حفظ',
+      checking: 'جاري التحقق…',
+      saved: 'نستخدم مفتاحك',
+      credits: (n) => `باقي ${ltr(String(n))} رصيد`,
+      remove: 'إزالة',
+    },
     unavailableReason: (reason, cause) =>
       cause === 'not-deployed'
         ? 'هذي النسخة من الموقع مبنية بدون خادم الذكاء الاصطناعي، فوضع صورة الذكاء الاصطناعي غير متاح هنا. الوضعين 2D و3D يشتغلون عادي.'
@@ -300,7 +315,7 @@ export const ar: Messages = {
     setup: 'الإعداد (للموظفين)',
     setupSteps: [
       'انسخ `.env.example` إلى `.env` داخل مجلد المشروع.',
-      'على هذا الكمبيوتر، اضبط `FASHN_API_KEY` على مفتاح FASHN الخاص بك و`AI_ENABLED=true`. لا تحط المفتاح أبد في متغير يبدأ بـ `VITE_`.',
+      'على هذا الكمبيوتر، اضبط `AI_ENABLED=true`، و`FASHN_API_KEY` على مفتاح FASHN الخاص بك (أو خلّه فاضي: الزوّار يضيفون مفاتيحهم من هذي اللوحة). لا تحط المفتاح أبد في متغير يبدأ بـ `VITE_`.',
       'أعد التشغيل بالأمر `npm run dev` (أو `npm run build` ثم `npm start`).',
     ],
     setupKeepsWorking: 'الوضعين 2D و3D يشتغلون عادي بدونه.',
@@ -317,8 +332,6 @@ export const ar: Messages = {
     photoTypes: { auto: 'تلقائي', 'flat-lay': 'مفرودة / بدون عارض', model: 'على عارض' },
     uploadGarment: 'ارفع صورة قطعة',
     devHint: 'للاختبار فقط؛ الخادم يتحقق من الصور المرفوعة وما يحفظها.',
-    footnote:
-      'وضع الذكاء الاصطناعي هو الوحيد اللي يرفع شي: الصورة تروح لخدمة FASHN السحابية، بس بعد موافقتك. الوضعين 2D و3D يبقون على هذا الجهاز.',
     photoErrors: {
       type: 'اختر صورة JPEG أو PNG أو WebP.',
       size: 'الصورة كبيرة مرة.',
@@ -326,20 +339,28 @@ export const ar: Messages = {
       convert: 'ما قدرنا نحوّل الصورة.',
     },
     items: {
+      'dress-green': {
+        label: 'فستان أخضر',
+        description: 'فستان ميدي بأكمام طويلة',
+        provenance: PHOTO_NOTE('Pexels', 'Vika Kirillova'),
+      },
+      'dress-purple': {
+        label: 'فستان بنفسجي طويل',
+        description: 'فستان طويل بأكمام واسعة',
+        provenance: PHOTO_NOTE('Pexels', 'abubakar mamman'),
+      },
+      'thobe-white': {
+        label: 'ثوب سعودي',
+        description: 'ثوب رجالي أبيض',
+        provenance: PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
+      },
+      'fanila-white': {
+        label: 'فنيلة',
+        description: 'فنيلة بيضاء بدون أكمام',
+        provenance: PHOTO_NOTE('Pexels', 'Sharon Snider'),
+      },
       'vneck-stone': { label: 'ياقة V · حجري', description: 'ياقة V بأكمام مرفوعة', provenance: RENDER_NOTE },
       'vneck-navy': { label: 'ياقة V · كحلي', description: 'ياقة V بأكمام مرفوعة', provenance: RENDER_NOTE },
-      'coral-crew-tee': { label: 'تيشيرت مرجاني', description: 'تيشيرت بياقة دائرية', provenance: ART_NOTE },
-      'breton-stripe-tee': {
-        label: 'مقلّم بريتون',
-        description: 'بلوزة مقلّمة بياقة واسعة',
-        provenance: ART_NOTE,
-      },
-      'chambray-button-shirt': {
-        label: 'قميص شامبراي',
-        description: 'قميص بأزارير وأكمام قصيرة',
-        provenance: ART_NOTE,
-      },
-      'forest-v-neck': { label: 'ياقة V أخضر', description: 'تيشيرت بياقة V', provenance: ART_NOTE },
     },
 
     checking: 'جاري التحقق من خدمة الذكاء الاصطناعي…',

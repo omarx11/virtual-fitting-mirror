@@ -1,4 +1,4 @@
-import { VNECK_RIG, VNECK_SIMULATION } from './rigs/vneck';
+import { VNECK_FEMALE_RIG, VNECK_RIG, VNECK_SIMULATION } from './rigs/vneck';
 import type {
   Garment2DDefinition,
   Garment3DDefinition,
@@ -100,8 +100,21 @@ export const VNECK_3D: Garment3DDefinition = {
   demo: false,
 };
 
+/** The same V-neck cut for women (female source model of the same Fab asset). */
+export const VNECK_FEMALE_3D: Garment3DDefinition = {
+  ...VNECK_3D,
+  id: 'vneck-women-3d',
+  name: 'V-neck women (3D)',
+  description: 'Women’s V-neck with rolled sleeves — rigged 3D model',
+  preview: 'garments/3d/vneck/preview-female.png',
+  model: 'garments/3d/vneck/shirt-female.glb',
+  variant: 'Female source model (SM_Shirt_01_woman), converted with FBX2glTF',
+  rig: VNECK_FEMALE_RIG,
+};
+
 export const GARMENTS: readonly GarmentDefinition[] = [
   VNECK_3D,
+  VNECK_FEMALE_3D,
   demoGarment('coral-crew-tee', 'Coral crew tee', 'Solid crew-neck T-shirt', {
     label: 'Coral',
     color: '#e8735f',

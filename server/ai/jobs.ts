@@ -17,6 +17,11 @@
  * instance that submitted it. A per-job lease guarantees one provider status call at a time, and
  * only the lease holder changes a job's provider state or ledger entry.
  *
+ * Visitor keys: a job paid with a visitor's own API key (`userKey`) uses a provider built from that
+ * key, is not counted in the operator's daily ledger or global concurrency bound, and stores only a
+ * hash of the key. The submitting instance keeps the provider in memory while it polls; any other
+ * instance can read the job's status only when the owner's status read carries the same key.
+ *
  * Images: inputs exist only in the memory of the submitting instance until submission; the result
  * is stored once, with a time to live, and never for an abandoned or purged job. Abandonment and
  * purging are separate flag keys, so they are never lost to a concurrent status update.
@@ -37,6 +42,20 @@ import type { UsageLedger } from './ledger';
 import { PRESETS } from './presets';
 import { mapRuntimeError, ProviderSubmitError, type TryOnProvider } from './providers/types';
 
+/** A visitor's own API key: the provider built from it, and the key's hash (the only part stored). */
+export interface UserKey {
+  provider: TryOnProvider;
+  hash: string;
+}
+
+/** Ledger for visitor-paid jobs: they never count against the operator's daily credits. */
+const VISITOR_LEDGER: Pick<UsageLedger, 'reserve' | 'charge' | 'release' | 'markUncertain'> = {
+  reserve: async () => true,
+  charge: async () => undefined,
+  release: async () => undefined,
+  markUncertain: async () => undefined,
+};
+
 export interface JobInput {
   sessionId: string;
   clientRequestId: string;
@@ -48,6 +67,8 @@ export interface JobInput {
   product: NormalizedImage;
   category: AiGarmentCategory;
   photoType: AiGarmentPhotoType;
+  /** The visitor's own key paying for this job, or null for the operator's. */
+  userKey?: UserKey | null;
 }
 
 /** Stored job metadata. Never contains an image or the provider's credentials. */
@@ -64,6 +85,8 @@ interface JobRecord {
   updatedAt: number;
   completedAt: number | null;
   deadlineAt: number;
+  /** Hash of the visitor's API key paying for the job, or null when the operator's key pays. */
+  keyHash: string | null;
   /** Provider prediction ID: server-only, never sent to the browser or accepted from it. */
   providerJobId: string | null;
   /** True while provider work is still tracked (it costs money and capacity until it settles). */
@@ -118,6 +141,8 @@ export class JobManager {
   private readonly kv: KvStore;
   private disposed = false;
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  /** Providers for visitor-paid jobs this instance submitted, until their polling ends. */
+  private readonly userProviders = new Map<string, TryOnProvider>();
 
   constructor(private readonly deps: JobManagerDeps) {
     this.now = deps.now ?? Date.now;
@@ -133,7 +158,8 @@ export class JobManager {
     if (this.disposed) throw new AppError('internal', 503, 'The server is shutting down.');
     // Settle work whose instance disappeared, so it does not block the concurrency bound.
     await this.reconcileStale();
-    const { ai, ledger } = this.deps;
+    const { ai } = this.deps;
+    const ledger = input.userKey ? VISITOR_LEDGER : this.deps.ledger;
     const accepted = await withLock(this.kv, 'jobs', async () => {
       const requestKey = k.request(input.sessionId, input.clientRequestId);
       const existingId = await this.kv.get(requestKey);
@@ -161,14 +187,16 @@ export class JobManager {
           );
         }
       }
-      if ((await this.inFlightJobs()).length >= ai.maxConcurrentJobs) {
+      // The bound protects the operator's account; visitors' own keys are limited per session only.
+      const operatorJobs = input.userKey ? 0 : (await this.inFlightJobs()).filter((j) => !j.keyHash).length;
+      if (operatorJobs >= ai.maxConcurrentJobs) {
         throw new AppError(
           'busy',
           429,
           'The previous preview is still finishing. Please try again in a few seconds.',
         );
       }
-      if (ledger.loadError) {
+      if (!input.userKey && this.deps.ledger.loadError) {
         throw new AppError('not-configured', 503, 'AI usage tracking is unavailable on this device.');
       }
       const id = randomBytes(18).toString('base64url');
@@ -189,6 +217,7 @@ export class JobManager {
         updatedAt: now,
         completedAt: null,
         deadlineAt: now + ai.jobDeadlineSeconds * 1000,
+        keyHash: input.userKey?.hash ?? null,
         providerJobId: null,
         inFlight: true,
         nextCheckAt: now + ai.pollIntervalMs,
@@ -208,16 +237,20 @@ export class JobManager {
       return { job: this.toView(job, null), created: { record: job, lease } };
     });
     if (!accepted.created) return { job: accepted.job, created: false };
+    if (input.userKey) this.userProviders.set(accepted.created.record.id, input.userKey.provider);
     const work = this.run(accepted.created.record, input, accepted.created.lease);
     (this.deps.defer ?? (() => undefined))(work);
     return { job: accepted.job, created: true };
   }
 
-  /** The owner's view of a job. Advances it first when a provider status read is due. */
-  async view(jobId: string, sessionId: string): Promise<AiJobView> {
+  /**
+   * The owner's view of a job. Advances it first when a provider status read is due; a visitor-paid
+   * job can be advanced with `userKey` when it is the key the job was submitted with.
+   */
+  async view(jobId: string, sessionId: string, userKey: UserKey | null = null): Promise<AiJobView> {
     let [job, flag] = await this.owned(jobId, sessionId);
     if (job.inFlight && this.now() >= job.nextCheckAt) {
-      await this.advance(jobId);
+      await this.advance(jobId, false, userKey);
       [job, flag] = await this.owned(jobId, sessionId);
     }
     return this.toView(job, flag);
@@ -264,6 +297,7 @@ export class JobManager {
     this.disposed = true;
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
+    this.userProviders.clear();
   }
 
   // ---- storage ------------------------------------------------------------------------------------
@@ -328,24 +362,40 @@ export class JobManager {
 
   // ---- provider work ----------------------------------------------------------------------------------
 
+  /** The provider that may read a job: the operator's, or the key the job was submitted with. */
+  private providerFor(job: JobRecord, offered: UserKey | null = null): TryOnProvider | null {
+    if (!job.keyHash) return this.deps.provider;
+    const local = this.userProviders.get(job.id);
+    if (local) return local;
+    return offered?.hash === job.keyHash ? offered.provider : null;
+  }
+
+  private ledgerFor(job: JobRecord) {
+    return job.keyHash ? VISITOR_LEDGER : this.deps.ledger;
+  }
+
   /** Background work for a new job: submit once, then poll until it settles. */
   private async run(job: JobRecord, input: JobInput, lease: string): Promise<void> {
     try {
-      await this.submit(job, input);
+      try {
+        await this.submit(job, input);
+      } finally {
+        await this.kv.delIfEquals(k.lease(job.id), lease).catch(() => undefined);
+      }
+      let delay = this.deps.ai.pollIntervalMs;
+      while (job.inFlight && !this.disposed) {
+        await this.sleep(delay);
+        if (this.disposed) return;
+        // The loop already waited for this read, so it does not wait for `nextCheckAt` again.
+        const step = await this.advance(job.id, true).catch(() => ({
+          settled: false,
+          delay: this.deps.ai.pollIntervalMs,
+        }));
+        if (step.settled) return;
+        delay = step.delay;
+      }
     } finally {
-      await this.kv.delIfEquals(k.lease(job.id), lease).catch(() => undefined);
-    }
-    let delay = this.deps.ai.pollIntervalMs;
-    while (job.inFlight && !this.disposed) {
-      await this.sleep(delay);
-      if (this.disposed) return;
-      // The loop already waited for this read, so it does not wait for `nextCheckAt` again.
-      const step = await this.advance(job.id, true).catch(() => ({
-        settled: false,
-        delay: this.deps.ai.pollIntervalMs,
-      }));
-      if (step.settled) return;
-      delay = step.delay;
+      this.userProviders.delete(job.id);
     }
   }
 
@@ -369,7 +419,9 @@ export class JobManager {
   }
 
   private async submit(job: JobRecord, input: JobInput): Promise<void> {
-    const { ai, provider, ledger } = this.deps;
+    const { ai } = this.deps;
+    const provider = input.userKey?.provider ?? this.deps.provider;
+    const ledger = this.ledgerFor(job);
     const outbound = base64Length(input.person.buffer.length) + base64Length(input.product.buffer.length);
     if (outbound > 2 * base64Length(ai.maxUploadBytes)) {
       await ledger.release(job.id);
@@ -418,14 +470,19 @@ export class JobManager {
    * job settled and when the next read is due. Reads triggered by the browser (`scheduled` false)
    * happen only once the job's `nextCheckAt` has passed.
    */
-  private async advance(jobId: string, scheduled = false): Promise<{ settled: boolean; delay: number }> {
-    const { ai, provider, ledger } = this.deps;
+  private async advance(
+    jobId: string,
+    scheduled = false,
+    userKey: UserKey | null = null,
+  ): Promise<{ settled: boolean; delay: number }> {
+    const { ai } = this.deps;
     const pending = { settled: false, delay: ai.pollIntervalMs };
     const lease = token();
     if (!(await this.kv.set(k.lease(jobId), lease, { nx: true, pxMs: STATUS_LEASE_MS }))) return pending;
     try {
       const job = await this.load(jobId);
       if (!job?.inFlight) return { settled: true, delay: 0 };
+      const ledger = this.ledgerFor(job);
       const now = this.now();
       if (!job.providerJobId) {
         // The submitting instance vanished before recording the outcome: it may have been sent.
@@ -443,6 +500,9 @@ export class JobManager {
         return { settled: true, delay: 0 };
       }
       if (!scheduled && now < job.nextCheckAt) return { settled: false, delay: job.nextCheckAt - now };
+      // A visitor-paid job whose key is not at hand waits for its owner's next status read.
+      const provider = this.providerFor(job, userKey);
+      if (!provider) return pending;
 
       let status: Awaited<ReturnType<TryOnProvider['status']>>;
       try {

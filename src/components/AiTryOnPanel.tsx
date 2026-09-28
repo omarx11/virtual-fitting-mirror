@@ -2,8 +2,8 @@ import { ImageUp, KeyRound, LogOut, TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useRef, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
-import type { AiGarmentCategory, AiGarmentPhotoType } from '../ai/types';
-import { AI_GARMENTS, findAiGarment } from '../garments/aiCatalogue';
+import { AI_USER_KEY_PATTERN, type AiGarmentCategory, type AiGarmentPhotoType } from '../ai/types';
+import { AI_GARMENTS } from '../garments/aiCatalogue';
 import { aiGarmentText } from '../i18n/catalogue';
 import { withCode } from '../i18n/format';
 import { useI18n } from '../i18n/I18nProvider';
@@ -11,6 +11,88 @@ import { SelectedRing } from './GarmentPicker';
 
 const CATEGORIES: readonly AiGarmentCategory[] = ['tops', 'bottoms', 'one-pieces'];
 const PHOTO_TYPES: readonly AiGarmentPhotoType[] = ['auto', 'flat-lay', 'model'];
+/** Where visitors create a FASHN API key. */
+const FASHN_KEYS_URL = 'https://app.fashn.ai/api';
+
+/**
+ * The visitor's own FASHN API key: a form (open when no other key can pay, folded away when it is
+ * optional), or a one-line note once a key is saved in this browser.
+ */
+function UserKeyForm({
+  state,
+  controller,
+  required,
+}: {
+  state: AiViewState;
+  controller: AiTryOnController;
+  required: boolean;
+}) {
+  const { m } = useI18n();
+  const [value, setValue] = useState('');
+  const key = state.userKey;
+  if (key.saved) {
+    return (
+      <p className="hint ai-access-ok" role="status" data-testid="ai-key-saved">
+        <KeyRound aria-hidden size={14} />
+        <span>
+          {m.ai.key.saved}
+          {key.credits !== null && ` · ${m.ai.key.credits(key.credits)}`}
+        </span>
+        <button type="button" className="text-button" onClick={() => controller.forgetUserKey()}>
+          {m.ai.key.remove}
+        </button>
+      </p>
+    );
+  }
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (await controller.saveUserKey(value)) setValue('');
+  };
+  const form = (
+    <form className="ai-access" onSubmit={submit} data-testid="ai-key">
+      <label className="field-label" htmlFor="ai-user-key">
+        <KeyRound aria-hidden size={14} /> {m.ai.key.title}
+      </label>
+      <p className="hint">
+        {m.ai.key.hint}{' '}
+        <a href={FASHN_KEYS_URL} target="_blank" rel="noreferrer">
+          {m.ai.key.getKey}
+        </a>
+      </p>
+      <div className="ai-access-row">
+        <input
+          id="ai-user-key"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={m.ai.key.placeholder}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={key.checking}
+        />
+        <button
+          type="submit"
+          className="button primary"
+          disabled={!AI_USER_KEY_PATTERN.test(value.trim()) || key.checking}
+        >
+          {key.checking ? m.ai.key.checking : m.ai.key.save}
+        </button>
+      </div>
+      {key.error && (
+        <p className="error-text" role="alert">
+          {m.ai.error(key.error.code, key.error.message)}
+        </p>
+      )}
+    </form>
+  );
+  if (required) return form;
+  return (
+    <details className="ai-dev">
+      <summary>{m.ai.key.optional}</summary>
+      {form}
+    </details>
+  );
+}
 
 /**
  * Side-panel controls for AI mode: garment choice (product photos), operator setup when AI is
@@ -36,11 +118,10 @@ export function AiTryOnPanel({
   const [photoType, setPhotoType] = useState<AiGarmentPhotoType>('auto');
   const generating = state.phase === 'submitting' || state.phase === 'queued' || state.phase === 'generating';
   const choice = state.garment;
-  const selected = choice?.kind === 'catalogue' ? findAiGarment(choice.id) : null;
   const caps = state.capabilities;
   const hasCustomerData = state.capture !== null || state.result !== null || state.consented;
   const [code, setCode] = useState('');
-  const locked = caps?.enabled === true && caps.access?.required === true && !caps.access.granted;
+  const locked = caps?.enabled === true && controller.payment() === 'access';
   const submitCode = async (e: FormEvent) => {
     e.preventDefault();
     // The code is sent once and forgotten; the server keeps this browser unlocked with a cookie.
@@ -50,6 +131,10 @@ export function AiTryOnPanel({
   return (
     <div className="ai-panel">
       <p className="hint lead">{m.ai.panelLead}</p>
+
+      {caps?.enabled && caps.keys.user && (
+        <UserKeyForm state={state} controller={controller} required={!caps.keys.server} />
+      )}
 
       {state.unavailable && (
         <div className="ai-unavailable" role="status" data-testid="ai-unavailable">
@@ -104,7 +189,7 @@ export function AiTryOnPanel({
           )}
         </form>
       )}
-      {caps?.access?.required && caps.access.granted && (
+      {caps?.keys.server && caps.access.required && caps.access.granted && !state.userKey.saved && (
         <p className="hint ai-access-ok" role="status">
           <KeyRound aria-hidden size={14} /> {m.ai.accessGranted}
         </p>
@@ -137,7 +222,6 @@ export function AiTryOnPanel({
             );
           })}
         </div>
-        {selected && <p className="hint">{aiGarmentText(m, selected).provenance}</p>}
         {choice?.kind === 'upload' && <p className="hint">{m.ai.uploadedHint}</p>}
       </fieldset>
 
@@ -225,8 +309,6 @@ export function AiTryOnPanel({
           <LogOut aria-hidden size={18} className="rtl-flip" /> {m.common.endSession}
         </button>
       )}
-
-      <p className="footnote">{m.ai.footnote}</p>
     </div>
   );
 }

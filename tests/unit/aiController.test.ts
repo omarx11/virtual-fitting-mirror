@@ -10,6 +10,7 @@ import {
   type AiJobStatus,
   type AiJobView,
 } from '../../src/ai/types';
+import { createMemoryKeyStore, type UserKeyStore } from '../../src/ai/userKey';
 
 const CAPS: AiCapabilities = {
   enabled: true,
@@ -25,6 +26,7 @@ const CAPS: AiCapabilities = {
   jobDeadlineSeconds: 120,
   providerRetentionUrl: 'https://docs.fashn.ai/api-overview/data-retention-privacy',
   access: { required: false, granted: true },
+  keys: { server: true, user: true },
 };
 
 type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void };
@@ -71,6 +73,17 @@ class FakeClient implements AiClient {
     if (code !== 'right-code-1')
       throw new AiApiError('access-denied', 403, 'That access code is not correct.');
   }
+  /** The visitor key the client currently sends (null: none). */
+  userKey: string | null = null;
+  setUserKey(key: string | null) {
+    this.userKey = key;
+  }
+  async checkKey(key: string) {
+    this.calls.push('check-key');
+    if (key !== 'fa-good-key-123')
+      throw new AiApiError('provider-auth', 403, 'FASHN did not accept this API key.');
+    return { credits: 42 };
+  }
   async createSession() {
     this.calls.push('session');
     return { expiresAt: 0, idleTimeoutSeconds: 600 };
@@ -96,7 +109,7 @@ class FakeClient implements AiClient {
   }
 }
 
-function setup() {
+function setup(keyStore?: UserKeyStore) {
   const client = new FakeClient();
   const timers: { fn: () => void; ms: number; id: number }[] = [];
   let nextId = 1;
@@ -123,6 +136,7 @@ function setup() {
     revokeObjectURL: (u) => urls.delete(u),
     randomUUID: () => `00000000-0000-4000-8000-${String(++urlCount).padStart(12, '0')}`,
     pollIntervalMs: 1000,
+    ...(keyStore ? { keyStore } : {}),
   });
   /** Advances the clock and runs the timers that are due now (one round), then settles promises. */
   const tick = async (ms = 1000) => {
@@ -239,8 +253,68 @@ describe('AI controller: access code on a public deployment', () => {
     t.controller.acceptConsent();
     await flush();
     expect(t.controller.getState().phase).toBe('error');
-    expect(t.controller.accessGranted()).toBe(false);
+    expect(t.controller.payment()).toBe('access');
     expect(t.client.calls.filter((c) => c === 'submit')).toHaveLength(0);
+  });
+
+  it('lets a visitor skip the access code with their own key', async () => {
+    const t = setup(createMemoryKeyStore('fa-good-key-123'));
+    t.client.caps = { ...CAPS, access: { required: true, granted: false } };
+    await t.controller.activate();
+    expect(t.controller.payment()).toBe('ok');
+    expect(t.client.userKey).toBe('fa-good-key-123');
+  });
+});
+
+describe("AI controller: the visitor's own API key", () => {
+  const noServerKey: AiCapabilities = { ...CAPS, keys: { server: false, user: true } };
+
+  it('asks for a key, checks it before saving, and keeps it across sessions', async () => {
+    const store = createMemoryKeyStore();
+    const t = setup(store);
+    t.client.caps = noServerKey;
+    await t.controller.activate();
+    t.controller.selectCatalogueGarment('coral-crew-tee', 'Coral crew tee');
+    t.controller.setCapture(photo());
+    expect(t.controller.payment()).toBe('key');
+    expect(t.controller.readyToGenerate()).toBe(false);
+
+    // Malformed keys are never sent; refused keys are never saved.
+    expect(await t.controller.saveUserKey('short')).toBe(false);
+    expect(t.client.calls).not.toContain('check-key');
+    expect(await t.controller.saveUserKey('fa-wrong-key-999')).toBe(false);
+    expect(t.controller.getState().userKey.error?.code).toBe('provider-auth');
+    expect(store.get()).toBeNull();
+    expect(t.client.userKey).toBeNull();
+
+    expect(await t.controller.saveUserKey('  fa-good-key-123  ')).toBe(true);
+    expect(store.get()).toBe('fa-good-key-123');
+    expect(t.client.userKey).toBe('fa-good-key-123');
+    expect(t.controller.getState().userKey).toEqual({
+      saved: true,
+      checking: false,
+      credits: 42,
+      error: null,
+    });
+    expect(t.controller.readyToGenerate()).toBe(true);
+
+    // The key belongs to the browser, not to one customer session.
+    t.controller.endSession();
+    expect(t.controller.getState().userKey.saved).toBe(true);
+
+    t.controller.forgetUserKey();
+    expect(store.get()).toBeNull();
+    expect(t.client.userKey).toBeNull();
+    expect(t.controller.payment()).toBe('key');
+  });
+
+  it('never sends a saved key to a server that does not accept visitor keys', async () => {
+    const t = setup(createMemoryKeyStore('fa-good-key-123'));
+    t.client.caps = { ...CAPS, keys: { server: true, user: false } };
+    await t.controller.activate();
+    expect(t.client.userKey).toBeNull();
+    expect(t.controller.getState().userKey.saved).toBe(false);
+    expect(await t.controller.saveUserKey('fa-good-key-123')).toBe(false);
   });
 });
 

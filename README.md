@@ -77,8 +77,15 @@ version with AI (Redis + an access code), see [Deploying to Vercel](#deploying-t
    notepad .env
    ```
 
-   Set `FASHN_API_KEY=<your key>` and `AI_ENABLED=true`, then save. `.env` is git-ignored. Never put
+   Set `FASHN_API_KEY=<your key>`, then save (`AI_ENABLED` is `true` by default; `false` turns AI
+   mode off completely). `.env` is git-ignored. Never put
    the key in a `VITE_*` variable, a screenshot, a ticket or a chat. Only the Node server reads it.
+
+   The key is optional: with `AI_USER_KEYS=true` (the default) visitors can instead paste their own
+   FASHN API key into the AI panel. The page checks it with FASHN, saves it in that browser's
+   `localStorage` and sends it (header `X-FASHN-Key`) only with that visitor's AI requests; the server
+   never stores or logs it. Those previews are paid by the visitor, so they need no access code and do
+   not count against `AI_MAX_DAILY_CREDITS`. Set `AI_USER_KEYS=false` on a shared kiosk.
 3. Restart `npm run dev` (or `npm start`). The server log prints `AI enabled` or why not, and the
    AI panel shows the same reason when AI is unavailable.
 
@@ -89,7 +96,7 @@ Spending limits (all enforced by the server; see `.env.example`):
   automatically**, and one whose outcome is unknown (timeout) stays counted;
 - `AI_MAX_DAILY_CREDITS=20` per UTC day, recorded in `.ai-usage/ledger.json` (credit counts only,
   no images), which survives restarts;
-- the provider is never called while `AI_ENABLED` is not true or no key is set.
+- the provider is never called while `AI_ENABLED=false`, or without a key (yours or the visitor's).
 
 **Usage:** in AI mode, open **Diagnostics** (`D`) → **AI usage**: today's credits against the cap,
 the FASHN account balance (read from FASHN's free `/v1/credits` endpoint, cached for a minute), and
@@ -258,9 +265,10 @@ Set up (once):
    (`regions` in `vercel.json`), the Vercel region closest to Saudi Arabia, so every Redis call stays
    inside one data centre.
 3. **Settings → Environment Variables** (Production; add Preview too if previews should run AI):
-   - `AI_ENABLED` = `true`
-   - `FASHN_API_KEY` = your FASHN key (mark it **Sensitive**)
-   - `AI_ACCESS_CODE` = a code of at least 8 characters, shared only with the people who may generate
+   - `FASHN_API_KEY` = your FASHN key (mark it **Sensitive**) — optional: without it (or without an
+     access code) visitors use their own key from the AI panel
+   - `AI_ACCESS_CODE` = a code of at least 8 characters, shared only with the people who may spend
+     your key
    - `AI_MAX_DAILY_CREDITS` = the daily spending cap in credits (default 20; 1 credit ≈ $0.075)
 4. Redeploy (Deployments → ⋯ → Redeploy) so the variables apply, then open the site over its
    `https://` address (the camera only works over HTTPS).
@@ -309,7 +317,7 @@ plan (256 MB, 500K commands a month) is far more than this app uses.
 | Slow or jerky | Open Diagnostics. If the delegate is CPU or the backend is main-thread, check that hardware acceleration is on (Chrome → Settings → System). Try Quality: Fast (Lite model). |
 | Note "Worker tracking failed … main thread" | The browser could not run the worker path; the app still works at a reduced rate. |
 | AI: "The local AI server is not running" | Start it with `npm run dev` (or `npm start` after a build) and check the `[api]` log lines. |
-| AI: "switched off" / "No FASHN API key" | Set `AI_ENABLED=true` and `FASHN_API_KEY` in `.env`, then restart the server. |
+| AI: "switched off" / no API key field | Remove `AI_ENABLED=false` from `.env` (or set it to `true`) and restart the server: `.env` is read only at start-up. Without `FASHN_API_KEY`, visitors add their own key in the AI panel. |
 | AI: "This request is not allowed" in development | The page's origin is not allowed; add it to `AI_ALLOWED_ORIGINS` in `.env`. |
 | AI: "daily AI preview limit" | The local cap (`AI_MAX_DAILY_CREDITS`, UTC day) is used up; it resets at 00:00 UTC. |
 | AI: "did not confirm the request" | A submission timed out. It was not resent and may still be charged; check the FASHN dashboard before trying again. |

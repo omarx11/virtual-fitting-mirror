@@ -11,6 +11,10 @@
  *
  * Invalid numbers or names fail fast with a clear message. A missing API key, Redis database or
  * access code does NOT fail: the app still serves 2D/3D and AI reports itself as unconfigured.
+ *
+ * Who pays: the operator's key (FASHN_API_KEY) and, unless AI_USER_KEYS=false, a visitor's own key
+ * entered in the AI panel. `unavailableReason` blocks AI entirely; `serverKeyReason` only blocks the
+ * operator's key, so visitors can still bring theirs.
  */
 import { isAbsolute, join, resolve } from 'node:path';
 import { AI_PRESET_IDS, type AiPresetId } from '../src/ai/types';
@@ -40,11 +44,17 @@ const FAKE_SCENARIOS: readonly FakeScenario[] = [
 ];
 
 export interface AiConfig {
-  /** Operator switch (AI_ENABLED). Even when true, AI can be unavailable; see `unavailableReason`. */
+  /**
+   * Operator switch (AI_ENABLED, default true: the operator's key is spent only once FASHN_API_KEY is
+   * set, otherwise visitors pay with their own). Even when true, AI can be unavailable; see
+   * `unavailableReason`.
+   */
   switchedOn: boolean;
   provider: ProviderName;
   /** Kept private to the provider adapter. Never logged or returned. */
   apiKey: string | null;
+  /** Visitors may use their own FASHN API key (AI_USER_KEYS, default true). */
+  userKeys: boolean;
   defaultPreset: AiPresetId;
   /** Presets the operator may choose in diagnostics (always includes the default). */
   presets: AiPresetId[];
@@ -71,8 +81,10 @@ export interface AiConfig {
   accessLifetimeHours: number;
   fakeScenario: FakeScenario;
   fakeStepMs: number;
-  /** Reason AI cannot be used right now, or null when it can. */
+  /** Reason AI cannot be used at all right now, or null when it can. */
   unavailableReason: string | null;
+  /** Reason the operator's key cannot pay for generations, or null when it can. */
+  serverKeyReason: string | null;
 }
 
 export interface ServerConfig {
@@ -210,9 +222,10 @@ export function loadConfig(
   );
 
   const ai: AiConfig = {
-    switchedOn: bool(env, 'AI_ENABLED', false),
+    switchedOn: bool(env, 'AI_ENABLED', true),
     provider,
     apiKey,
+    userKeys: bool(env, 'AI_USER_KEYS', true),
     defaultPreset,
     presets: [...presets],
     maxConcurrentJobs: int(env, 'AI_MAX_CONCURRENT_JOBS', 1, 1, 6),
@@ -235,27 +248,33 @@ export function loadConfig(
     fakeScenario,
     fakeStepMs: int(env, 'AI_FAKE_STEP_MS', 700, 1, 60_000),
     unavailableReason: null,
+    serverKeyReason: null,
   };
 
-  // Fail closed: every reason AI must not run is reported instead of silently degrading.
+  // Fail closed: every reason the operator's key must not be spent is reported, not silently skipped.
+  if (provider === 'fashn' && !apiKey) {
+    ai.serverKeyReason = 'No FASHN API key is configured on the server (FASHN_API_KEY).';
+  } else if (ai.maxDailyCredits === 0) {
+    ai.serverKeyReason = 'The daily AI credit limit is 0 (AI_MAX_DAILY_CREDITS).';
+  } else if (vercel && !accessCode) {
+    ai.serverKeyReason =
+      'Set AI_ACCESS_CODE (at least 8 characters) in the Vercel project settings: the site is public.';
+  }
+
+  // Every reason AI must not run at all, whoever's key pays.
   if (!ai.switchedOn) {
     ai.unavailableReason = 'AI mode is switched off on the server (AI_ENABLED is not true).';
-  } else if (provider === 'fashn' && !apiKey) {
-    ai.unavailableReason = 'No FASHN API key is configured on the server (FASHN_API_KEY).';
   } else if (provider === 'fake' && production && !bool(env, 'AI_ALLOW_FAKE_PROVIDER', false)) {
     ai.unavailableReason = 'The offline test provider is disabled in production.';
-  } else if (ai.maxDailyCredits === 0) {
-    ai.unavailableReason = 'The daily AI credit limit is 0 (AI_MAX_DAILY_CREDITS).';
   } else if (store === 'redis' && !ai.redis) {
     ai.unavailableReason =
       'No Redis database is connected (add "Upstash for Redis" to the project in the Vercel Marketplace).';
-  } else if (vercel && !accessCode) {
-    ai.unavailableReason =
-      'Set AI_ACCESS_CODE (at least 8 characters) in the Vercel project settings: the site is public.';
   } else if (!vercel && !isLoopbackHost(host) && !bool(env, 'AI_ALLOW_NON_LOOPBACK', false)) {
     ai.unavailableReason =
       'AI is disabled because the server listens beyond this computer without access control. ' +
       'Bind to 127.0.0.1, or add authentication + HTTPS and set AI_ALLOW_NON_LOOPBACK=true.';
+  } else if (ai.serverKeyReason && !ai.userKeys) {
+    ai.unavailableReason = ai.serverKeyReason;
   }
 
   const logLevel = (str(env, 'AI_LOG_LEVEL') ?? 'warn') as ServerConfig['logLevel'];
