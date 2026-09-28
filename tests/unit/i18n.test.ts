@@ -87,7 +87,7 @@ describe('status messages in Arabic', () => {
 
   it('maps phases and tracker errors to Arabic, keeping the staff command', () => {
     expect(describeStatus({ tracker: ready, source, phase: 'too-close' }, ar.status)?.title).toBe(
-      'ارجع ورا شوي',
+      'ابتعد قليلًا',
     );
     const error = describeStatus(
       {

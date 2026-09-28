@@ -222,7 +222,7 @@ test.describe('language', () => {
     await expect(html).toHaveAttribute('lang', 'ar-SA');
     await expect(page).toHaveTitle('مرآة القياس الافتراضية');
     await expect(page.getByRole('heading', { name: 'مرآة القياس الافتراضية' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'افتح ملف فيديو' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'فتح ملف فيديو' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'وضع التجربة' })).toBeVisible();
     // The sidebar stays on the right of the mirror (the page layout does not flip), its content reads
     // right to left, and nothing spills sideways.
