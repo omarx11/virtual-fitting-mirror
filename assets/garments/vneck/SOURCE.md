@@ -82,5 +82,6 @@ substituted. The runtime uses flat, neutral colours (`FABRIC_COLOURS` in
 
 ## Future conversions
 
-Keep the FBX files for re-exports, for example a female-variant GLB or baked maps. A new GLB needs
-its own entry here with hashes, plus a rig/calibration file in `src/garments/rigs/`.
+Keep the FBX files for re-exports, for example baked maps. A new GLB needs its own entry here with
+hashes, plus a rig/calibration entry in `src/garments/rigs/` (the female variant reuses `VNECK_RIG`
+as `VNECK_FEMALE_RIG`, so it can be tuned separately later).

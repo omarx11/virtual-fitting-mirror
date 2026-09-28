@@ -36,7 +36,10 @@ presented as body measurement, sizing validation or guaranteed photorealistic cl
 - **Material.** No fabric texture maps matched the downloaded model, so it is rendered in flat
   neutral colours with a PBR fabric material (roughness ~0.86, light sheen). The video's lighting is
   not transferred to the shirt, and the colours are not calibrated to a real product.
-- **Male source model only.** No female-variant GLB has been converted, and the catalogue says so.
+- **Two cuts of one model.** The men's and women's V-necks are the male and female source models of
+  the same Fab asset. The women's GLB was converted from FBX here (see
+  `assets/garments/vneck/SOURCE.md`) and reuses the men's rig and fit calibration unchanged; it has
+  not been tuned separately on footage of women.
 - **Licence.** The model is third-party content from Fab. The creator name and licence label still
   need to be recorded from the listing or receipt (see `assets/garments/vneck/SOURCE.md`) before
   any public deployment.
@@ -130,16 +133,22 @@ relaxed.
 
 ## AI photo mode (cloud generation)
 
-- **Real FASHN generation has not been verified.** No API key was available when it was built, so only
-  the offline fake provider and a mocked FASHN transport were exercised. Latency, cost per result and
-  image quality on real kiosk photos are unknown until `npm run smoke:ai` is run with an approved
-  image pair (see [TESTING.md](TESTING.md)).
+- **Real FASHN generation is only checked by eye.** The automated tests use the offline fake
+  provider and a mocked FASHN transport. Real generations were tried during development (that is how
+  the on-model photo problem below was found), but latency, cost per result and image quality on real
+  kiosk photos have not been measured or recorded; run `npm run smoke:ai` with an approved image
+  pair for that (see [TESTING.md](TESTING.md)).
 - It is a **still photo**, not a live try-on: capture → generate (≈10 s provider time for Try-On Max
   fast/1K, plus upload and queueing) → display. There is no continuous generation or animation.
 - Generated images can **change identity, body shape, text/logos, colour and garment details**, and
   may handle crossed arms or loose → fitted clothing poorly. It is not a size or fit tool.
-- **Demo garment photos only.** The catalogue images are synthetic stand-ins (a texture-less 3D render
-  and flat CC0 artwork; see `assets/garments/ai/SOURCE.md`). Shop use needs real product photos.
+- **Garment photos must show no person.** With an on-model photo the provider copied the model's
+  face and accessories (shemagh, sunglasses) onto the shopper, so the catalogue now uses only
+  flat-lay or ghost-mannequin photos.
+- **Catalogue photos are not shop products.** The dresses, jumpsuits and thobes are real garments in
+  photos supplied by the project owner, whose **licence is not yet recorded**: confirm it before any
+  public deployment. The two V-neck entries are texture-less renders of the 3D model (demo only). All
+  are one-pieces except the V-necks; see `assets/garments/ai/SOURCE.md`.
 - Output aspect ratio may differ from the capture (v1.6 processes at 864 × 1296). Before/after are
   shown uncropped and undistorted in the same box, so they can differ slightly in framing.
 - The full camera frame is sent (no crop step). A landscape webcam frame leaves the person small;
@@ -158,13 +167,19 @@ relaxed.
 - On Vercel a job whose submitting function instance stops is finished by the next status read;
   if the instance stopped while submitting, the outcome is unknown and the credit stays counted
   ('uncertain'), exactly like a timeout.
+- **Visitor API keys** (`AI_USER_KEYS=true`, the default): a visitor's own FASHN key is saved in that
+  browser's `localStorage` until they press Remove, and is sent with their AI requests. Anyone who
+  later uses the same browser can spend it, so set `AI_USER_KEYS=false` on a shared kiosk. These
+  previews bypass the access code and the daily credit cap (the visitor pays), so the cap does not
+  bound them.
 - Tracking is kept running in AI mode only for framing guidance; it is not used for generation.
 
 ## Privacy and network
 
 - **2D and 3D:** video (file or camera) is processed in the browser and is **never uploaded**. No
   footage or screenshots are saved; only harmless UI preferences go to `localStorage` (never photos,
-  results or AI consent).
+  results or AI consent). The one exception is a visitor's own FASHN API key, if they enter one in AI
+  mode (see above).
 - **AI mode** is the exception, and only after the shopper agrees for that session: one captured
   photo and the garment image go from the browser to the AI server (same origin: the kiosk's local
   server or the Vercel Function), which sends them to FASHN. The browser itself still only talks to
@@ -173,7 +188,7 @@ relaxed.
 - The server never stores the photo (it exists only in memory until it is sent). The generated
   image is kept until End session, the idle timeout, or 2 minutes after the result, whichever comes
   first: in memory on the kiosk, in the Upstash Redis database (Frankfurt) on Vercel. Neither is
-  written to disk, logs or `localStorage`.
+  written to disk, logs or `localStorage` by the app; the shopper can save it with **Download**.
   FASHN keeps request records (without images) and makes the generated image retrievable for up to
   60 minutes; ending the session here cannot delete provider-side data. See
   [FASHN data retention](https://docs.fashn.ai/api-overview/data-retention-privacy).
@@ -195,8 +210,8 @@ relaxed.
 
 ## Sensible next steps
 
-0. AI mode: add a FASHN key locally, run `npm run smoke:ai` on an approved image pair, review the
-   result by eye, and replace the demo garment photos with real shop photos.
+0. AI mode: run `npm run smoke:ai` on an approved image pair and record time, credits and a review
+   of the result; confirm the licence of the AI product photos (or replace them with the shop's own).
 
 1. Record the Fab creator and licence in SOURCE.md; test on the real kiosk camera, distance and
    lighting.

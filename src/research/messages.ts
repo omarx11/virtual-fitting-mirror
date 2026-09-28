@@ -16,8 +16,8 @@ const en = {
   title: { pre: 'Behind the ', accent: 'mirror', post: '' } as AccentText,
   lede: 'What we built, how we put it to the test, and where it still falls short. The honest, short version.',
   stats: [
-    { value: '218', label: 'automated tests' },
-    { value: '28', label: 'browser tests on a real GPU' },
+    { value: '260', label: 'automated tests' },
+    { value: '33', label: 'browser tests on a real GPU' },
     { value: '30 fps', label: 'live tracking' },
     { value: '16 ms', label: 'to find a pose' },
     { value: '0', label: 'requests leave the device in 2D / 3D' },
@@ -36,7 +36,7 @@ const en = {
     { title: 'Camera', text: 'Webcam or a video file' },
     { title: 'Pose model', text: '33 body points, in a background worker' },
     { title: 'Interpreter', text: 'Facing me? Too close? Which person?' },
-    { title: 'Garment', text: '2D art, rigged 3D shirt or cloth' },
+    { title: 'Garment', text: '2D art, men’s or women’s 3D shirt, or cloth' },
     { title: 'Mirror', text: 'Drawn over the video, flipped' },
   ],
   pipelineNote:
@@ -61,7 +61,7 @@ const en = {
     },
     {
       title: 'AI photo: FASHN cloud API',
-      why: 'The strongest open models (CatVTON, IDM-VTON) are licensed for non-commercial use only. The cloud API also avoids a Python/GPU setup on the kiosk.',
+      why: 'The strongest open models (CatVTON, IDM-VTON) are licensed for non-commercial use only. The cloud API also avoids a Python/GPU setup on the kiosk. Garment photos show no person: with on-model shots it copied the model’s face onto the shopper.',
     },
     {
       title: 'Privacy: block the tracker’s phone-home',
@@ -120,11 +120,13 @@ const en = {
     { name: 'Several people: keeps the right one' },
     { name: 'Portrait kiosk, landscape, phone' },
     { name: 'Nothing sent to the internet (2D / 3D)' },
+    { name: 'English and Arabic, right to left' },
+    { name: 'AI across several server instances', note: 'tests + Redis in Docker' },
     { name: 'Walking closer and farther', note: 'cropped clips only' },
     { name: 'Crossed arms in front of the chest', note: 'simulated poses only' },
     { name: 'AI photo flow', note: 'with a fake provider' },
+    { name: 'A real AI generation', note: 'tried by eye, not measured' },
     { name: 'A real webcam' },
-    { name: 'A real AI generation', note: 'needs an API key' },
     { name: 'Firefox, Safari, other GPUs' },
   ] as { name: string; note?: string }[],
   hardware:
@@ -137,13 +139,14 @@ const en = {
     { title: 'One person at a time', text: 'In a crowd it fades out rather than jump to someone else.' },
     {
       title: 'AI photo is a still',
-      text: 'About 10 s per image, and it may change faces, logos or body shape.',
+      text: 'About 10 s per image. It may change faces, logos or body shape, and the garment photo must show no person.',
     },
   ],
   next: [
     'Try a real webcam at the kiosk’s distance and lighting',
     'Measure speed on the actual kiosk PC',
-    'Run one real AI generation and review it by eye',
+    'Time and review real AI generations on kiosk photos',
+    'Confirm the licences of the 3D shirt and the AI product photos',
     'Film crossed arms and slow full turns',
     'Test Firefox, Safari and other graphics cards',
   ],
@@ -162,8 +165,8 @@ const ar: ResearchMessages = {
   title: { pre: 'كواليس ', accent: 'المرآة', post: '' },
   lede: 'وش بنينا، وكيف اختبرناه، ووين لسّا فيه قصور. النسخة الصريحة والمختصرة.',
   stats: [
-    { value: '218', label: 'اختبار آلي' },
-    { value: '28', label: 'اختبار متصفح على معالج رسوميات حقيقي' },
+    { value: '260', label: 'اختبار آلي' },
+    { value: '33', label: 'اختبار متصفح على معالج رسوميات حقيقي' },
     { value: ltr('30 fps'), label: 'تتبّع مباشر' },
     { value: ltr('16 ms'), label: 'لتحديد وضعية الجسم' },
     { value: '0', label: 'طلبات تطلع من الجهاز في 2D و3D' },
@@ -182,7 +185,7 @@ const ar: ResearchMessages = {
     { title: 'الكاميرا', text: 'كاميرا ويب أو ملف فيديو' },
     { title: 'نموذج الوضعية', text: '33 نقطة في الجسم، في عامل خلفي' },
     { title: 'المفسّر', text: 'مقابلني؟ قريب مرة؟ أي شخص؟' },
-    { title: 'القطعة', text: 'رسم 2D، أو قميص 3D، أو قماش' },
+    { title: 'القطعة', text: 'رسم 2D، أو قميص 3D رجالي أو نسائي، أو قماش' },
     { title: 'المرآة', text: 'مرسومة فوق الفيديو ومقلوبة' },
   ],
   pipelineNote:
@@ -207,7 +210,7 @@ const ar: ResearchMessages = {
     },
     {
       title: 'صورة الذكاء الاصطناعي: واجهة FASHN السحابية',
-      why: 'أقوى النماذج المفتوحة (CatVTON وIDM-VTON) مرخّصة للاستخدام غير التجاري فقط. والواجهة السحابية تغنينا عن تجهيز Python وGPU على جهاز العرض.',
+      why: 'أقوى النماذج المفتوحة (CatVTON وIDM-VTON) مرخّصة للاستخدام غير التجاري فقط. والواجهة السحابية تغنينا عن تجهيز Python وGPU على جهاز العرض. وصور القطع بدون أشخاص: مع صور العارضين كان ينسخ وجه العارض على المتسوّق.',
     },
     {
       title: 'الخصوصية: منع التتبّع من الاتصال بالخارج',
@@ -267,11 +270,13 @@ const ar: ResearchMessages = {
     { name: 'أكثر من شخص: يتمسّك بالشخص الصحيح' },
     { name: 'جهاز طولي، وعرضي، وجوال' },
     { name: 'ما ينرسل شي للإنترنت (2D و3D)' },
+    { name: 'بالعربي والإنجليزي، ومن اليمين لليسار' },
+    { name: 'الذكاء الاصطناعي على أكثر من نسخة خادم', note: 'اختبارات + Redis في Docker' },
     { name: 'يقرّب ويبعّد', note: 'مقاطع مقصوصة فقط' },
     { name: 'اليدين متقاطعة قدّام الصدر', note: 'وضعيات محاكاة فقط' },
     { name: 'مسار صورة الذكاء الاصطناعي', note: 'بمزوّد وهمي' },
+    { name: 'توليد حقيقي بالذكاء الاصطناعي', note: 'جرّبناه بالعين، بدون قياس' },
     { name: 'كاميرا ويب حقيقية' },
-    { name: 'توليد حقيقي بالذكاء الاصطناعي', note: 'يحتاج مفتاح API' },
     { name: 'Firefox وSafari ومعالجات رسوميات ثانية' },
   ],
   hardware:
@@ -284,13 +289,14 @@ const ar: ResearchMessages = {
     { title: 'شخص واحد بالمرة', text: 'في الزحمة يبهت بدل ما ينط على شخص ثاني.' },
     {
       title: 'صورة الذكاء الاصطناعي ثابتة',
-      text: 'حوالي 10 ث للصورة، وممكن تغيّر الوجه أو الشعارات أو شكل الجسم.',
+      text: 'حوالي 10 ث للصورة، وممكن تغيّر الوجه أو الشعارات أو شكل الجسم، وصورة القطعة لازم تكون بدون شخص.',
     },
   ],
   next: [
     'تجربة كاميرا ويب حقيقية على مسافة وإضاءة جهاز العرض',
     'قياس السرعة على كمبيوتر جهاز العرض الفعلي',
-    'تشغيل توليد حقيقي واحد بالذكاء الاصطناعي ومراجعته بالعين',
+    'قياس وقت وجودة توليدات حقيقية على صور جهاز العرض',
+    'تأكيد تراخيص القميص ثلاثي الأبعاد وصور منتجات الذكاء الاصطناعي',
     'تصوير اليدين المتقاطعة والالتفات الكامل البطيء',
     'اختبار Firefox وSafari وكروت شاشة ثانية',
   ],

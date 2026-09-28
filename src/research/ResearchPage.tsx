@@ -88,10 +88,12 @@ const SCORECARD: ScoreStatus[] = [
   'pass',
   'pass',
   'pass',
+  'pass',
+  'pass',
   'partial',
   'partial',
   'partial',
-  'todo',
+  'partial',
   'todo',
   'todo',
 ];

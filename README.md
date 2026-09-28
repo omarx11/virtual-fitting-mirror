@@ -13,10 +13,12 @@ A **2D / 3D / AI** selector picks the mode:
 
 - **2D** and **3D** are live tracked previews. They run entirely on your computer, with no account,
   paid API or upload.
-- **AI** (optional) is a **generated still photo**: capture a frame, choose a garment photo, and a
-  cloud try-on model (FASHN, paid per image) generates one picture to compare with the capture. It
-  is not live. It needs the small local Node server, which holds the API key, and it uploads the
-  captured photo only after the shopper agrees.
+- **AI** (optional) is a **generated still photo**: capture a frame, choose a garment photo (dresses,
+  jumpsuits and thobes, plus renders of the 3D V-neck), and a cloud try-on model (FASHN, paid per
+  image) generates one picture to compare with the capture. It is not live. It needs an AI server
+  (the small local Node server on a kiosk, or a Vercel Function online) that talks to FASHN with the
+  operator's API key or a visitor's own key, and it uploads the captured photo only after the
+  shopper agrees.
 
 Every mode is an approximate **visual preview**, not body measurement or a sizing tool: your own
 clothes can show at the edges in 2D/3D, and AI images can alter details — see
@@ -124,9 +126,10 @@ performance mode, 1 credit), selectable in Diagnostics.
 2. **Or use a webcam:** click **Use camera**. The browser asks for camera permission only at that
    point; the microphone is never requested. Camera access works on `http://localhost`; from any
    other address the page must be served over HTTPS.
-3. **Pick a shirt:** click a thumbnail, or press `[` / `]`. **V-neck (3D)** (default) is the rigged 3D
-   model; choose a fabric colour below the thumbnails. The other four are flat 2D demo images.
-   Switching never reloads the tracker, and works while playing or paused.
+3. **Pick a shirt:** click a thumbnail, or press `[` / `]`. In **3D** there are two rigged models of
+   the same shirt, **V-neck (3D)** (default, men's cut) and **V-neck women (3D)**; choose a fabric
+   colour below the thumbnails. In **2D** one card holds the four flat demo shirts, chosen by colour
+   swatch. Switching never reloads the tracker, and works while playing or paused.
 4. **Adjust fit:** **Size** and **Height** sliders; **Reset fit** restores the defaults.
 5. **View:** toggle **Shirt**, **Mirror** (flips video and shirt together), **Fullscreen**
    (good for a vertical kiosk screen), and **Framing** (show the whole video or fill the screen).
@@ -146,13 +149,15 @@ performance mode, 1 credit), selectable in Diagnostics.
 1. Face the camera with the upper body visible and the arms slightly away from the body.
 2. **Capture photo** freezes a clean frame (never the shirt overlay). **Retake** returns to the live
    view.
-3. Choose a garment photo in the panel.
+3. Choose a garment photo in the panel. The garments are product-only photos (no person in them):
+   with an on-model photo the provider copies the model's face and accessories onto the shopper.
 4. **Generate preview**. The first time in a session, a short opt-in explains that the photo goes to
    FASHN. Nothing is uploaded before **Agree & generate**.
 5. While it runs, the stage shows what is happening (uploading, queue, generating) and the elapsed
    time. The result is labelled **AI-generated preview**, with **Before / After / Side by side**,
-   **Retake**, **Try another garment** (reuses the same captured photo) and **End session** (deletes
-   the photo and result here and resets the opt-in for the next customer).
+   **Download** (saves the generated JPEG, unmirrored), **Retake**, **Try another garment** (reuses
+   the same captured photo) and **End session** (deletes the photo and result here and resets the
+   opt-in for the next customer).
 6. Switching to 2D or 3D stops waiting for a result and ends the AI session.
 
 Developer test inputs (development builds): use a photo file instead of the camera, or upload a
@@ -202,13 +207,13 @@ even lighting, roughly 1–3 m away. Chest-up framing is supported. The 3D shirt
 | `npm run test:e2e` | Playwright browser tests (Vite on 5174 + backend on 3101 with the fake provider) |
 | `npm run test:e2e:preview` | Build, then run the asset-path/privacy/3D/AI browser tests against the production server (port 4174) |
 | `npm run smoke:ai` | Opt-in: ONE paid FASHN generation for an approved image pair (see AI mode setup) |
-| `npm run generate:ai-garments` | Regenerate the demo AI product photos in `public/garments/ai/` |
+| `npm run generate:ai-garments` | Rebuild the AI product photos in `public/garments/ai/` from `assets/garments/ai/photos/` and render the V-neck demo images (`-- --photos-only` skips the renders) |
 | `npm run inspect:garment` | Print the V-neck GLB's full node hierarchy, joints and bind positions |
-| `npm run generate:3d-thumbnail` | Render `public/garments/3d/vneck/preview.png` from the actual model |
+| `npm run generate:3d-thumbnail` | Render the 3D thumbnails (`preview.png`, `preview-female.png`) from the actual models (`-- <garment id>` for one) |
 | `npm run check` | typecheck + lint + unit and server tests + build (never calls a paid API) |
 | `npm run setup:assets` | Download/verify the models (`-- --check` to only verify) |
 | `npm run generate:garments` | Regenerate the demo shirt SVGs |
-| `npm run generate:brand` | Rebuild the web-sized Qassim University logo images from `assets/brand/` |
+| `npm run generate:brand` | Rebuild the web-sized Qassim University logo images from `assets/brand/` and the link-preview image `public/og-image.png` from `public/icon.svg` |
 | `npm run fetch:footage` | Download the openly licensed test clips (not committed) + derive crops with ffmpeg |
 
 First-time Playwright setup, only if Chromium isn't installed yet: `npx playwright install chromium`.
@@ -347,13 +352,14 @@ server/           Node backend (Fastify): config, AI routes, sessions, jobs, dai
                   code, state store (memory or Redis), image validation (Sharp), providers (FASHN
                   SDK adapter, offline fake); vercel.ts = the Vercel Function entry
 src/config/       documented thresholds, quality presets, 3D render settings
-public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLB (third-party);
-                  ai/<id>/ demo product photos for AI mode (assets/garments/ai/SOURCE.md)
-assets/garments/  authoring sources (FBX), SOURCE.md — never shipped by Vite
+public/garments/  demo shirt art (CC0) + anchors (LICENSE.md); 3d/vneck/ runtime GLBs, men's and
+                  women's (third-party); ai/<id>/ product photos for AI mode (assets/garments/ai/SOURCE.md)
+assets/garments/  authoring sources (FBX, original AI product photos), SOURCE.md — never shipped by Vite
 assets/brand/     original Qassim University logo (source for npm run generate:brand)
 public/models/    pose models (downloaded, not committed)
 scripts/          setup-assets.mjs, generate-garments.mjs, inspect-garment.mjs, generate-3d-thumbnail.mjs,
-                  generate-brand-assets.mjs
+                  generate-ai-garments.mjs, generate-brand-assets.mjs, bake-fbx-garment.mjs (FBX2glTF
+                  output → loader layout), ai-smoke.ts
 tests/unit, tests/server, tests/e2e, tests/fixtures
 docs/             RESEARCH, IMPLEMENTATION_PLAN, TESTING, LIMITATIONS, AI_TRYON_RESEARCH
 spike.html        standalone worker/delegate timing check (dev server: /spike.html)
@@ -390,14 +396,17 @@ Details and coordinate conventions: [docs/RESEARCH.md](docs/RESEARCH.md).
 
 1. Put the runtime `.glb` (one skinned mesh) under `public/garments/3d/<id>/` and authoring files
    under `assets/garments/<id>/source/`; write `assets/garments/<id>/SOURCE.md` (licence, hashes).
+   With only an FBX, convert it with FBX2glTF and bake it with `scripts/bake-fbx-garment.mjs`, as
+   was done for the women's V-neck (commands in `assets/garments/vneck/SOURCE.md`).
 2. Run `node scripts/inspect-garment.mjs <file.glb>` to see joint names, bind positions and axes.
 3. Create `src/garments/rigs/<id>.ts` using `vneck.ts` as the template:
    - bone-name patterns;
    - `restRotationDeg`, only if the model is not +Y up / +X wearer's left / +Z front;
    - fit calibration, pose limits, clavicle lift;
    - optionally a simulation config.
-4. Add a `kind: '3d'` entry to `GARMENTS` in `src/garments/catalogue.ts`, with fabric options, and
-   generate a thumbnail. Check it in `/?inspect=3d` (dev server) and on footage with the landmark
+4. Add a `kind: '3d'` entry to `GARMENTS` in `src/garments/catalogue.ts`, with fabric options, its
+   name and description under `garments.items` in `src/i18n/en.ts` and `ar.ts`, and its thumbnail
+   path to `TARGETS` in `scripts/generate-3d-thumbnail.mjs`; then generate the thumbnail. Check it in `/?inspect=3d` (dev server) and on footage with the landmark
    overlay. No renderer changes are needed.
 
 ## Licences
@@ -405,7 +414,9 @@ Details and coordinate conventions: [docs/RESEARCH.md](docs/RESEARCH.md).
 App code: yours to choose (no licence file added). Dependencies: MIT / ISC / Apache-2.0 (see
 [docs/RESEARCH.md](docs/RESEARCH.md)); the AI backend adds `fashn` and `sharp` (Apache-2.0) and
 Fastify packages (MIT). The pose models are Apache-2.0 (MediaPipe model card). Demo
-2D garments: CC0 (original). **The 3D V-neck is third-party content from Fab** under its own licence
-(not CC0); see [assets/garments/vneck/SOURCE.md](assets/garments/vneck/SOURCE.md) before
-redistributing or deploying it. The test footage is third-party, CC BY/BY-SA, and not committed —
+2D garments: CC0 (original). **The 3D V-neck (both cuts) is third-party content from Fab** under its
+own licence (not CC0); see [assets/garments/vneck/SOURCE.md](assets/garments/vneck/SOURCE.md) before
+redistributing or deploying it. **The AI product photos** were supplied by the project owner and their
+licence is not recorded yet; confirm it before a public deployment (see
+[assets/garments/ai/SOURCE.md](assets/garments/ai/SOURCE.md)). The test footage is third-party, CC BY/BY-SA, and not committed —
 see [test-footage/SOURCES.md](test-footage/SOURCES.md).

@@ -5,6 +5,47 @@ RX 9070 XT** (driver 32.0.31041.1004; WebGL renderer "ANGLE (AMD … Direct3D11)
 Browser: Playwright Chromium 153.0.8010.12 (headless, real GPU via ANGLE/D3D11). The user's own video
 and a physical webcam were **not available** (see "Not verified").
 
+## Later changes (branch `development`, 2026-09-27 → 2026-09-28)
+
+English/Arabic translation with right-to-left layout, the Vercel deployment (Upstash Redis, access
+code), visitor FASHN keys, the women's 3D V-neck, product-only AI garment photos and the AI result
+download.
+
+| Command | Result |
+| --- | --- |
+| `npm test` (2026-09-28) | ✅ **260 passed**, 4 skipped, in 24 files. The skipped file is `tests/server/redis.integration.test.ts`, which needs a real Redis in Docker (see the comment at its top). |
+| Browser tests | **33** in `npm run test:e2e` (6 files) and **10** in `npm run test:e2e:preview`. Counted with `--list`; not re-run for this entry. |
+
+What the new tests cover:
+
+- **Arabic:** `tests/unit/i18n.test.ts` fails on any Arabic message that is missing or still in
+  English; `tests/e2e/app.spec.ts` switches the whole app to Arabic (right to left, remembered) and
+  opens `/research?lang=ar`.
+- **Several server instances** (`tests/server/jobs.test.ts`, "several server instances sharing one
+  store"): a duplicate sent to two instances creates one provider job, global concurrency holds
+  across instances, another instance finishes a job whose submitting instance disappeared, and a
+  submission lost with its instance becomes uncertain and keeps its credit.
+- **Vercel** (`tests/server/vercel.test.ts`): Redis and an access code are required, uploads fit the
+  4.5 MB request limit, cookies are Secure, the whole flow works across instances, only the site's
+  own origin and `/api/ai` paths are accepted, wrong access codes are limited, and a wrong or
+  unreachable Redis is reported up front.
+- **Visitor keys** (`tests/server/config.test.ts`, `tests/unit/aiController.test.ts`,
+  `tests/e2e/ai.spec.ts`): the operator's key is optional, a visitor's key is sent only with their
+  own requests, and `AI_USER_KEYS=false` turns the option off.
+- **Women's V-neck** (`tests/unit/modelLoader.test.ts`): the baked FBX2glTF conversion loads in the
+  same layout as the men's model, with the rest pose within 0.1 mm.
+- **Result download** (`tests/e2e/ai.spec.ts`): the Download button saves the result image.
+
+Checked by hand before deploying: `vercel build` on exactly the files a Git deployment contains, then
+the packaged function against a real Redis in Docker with the offline fake provider (access code →
+session → job → result → end session).
+
+**Real FASHN generations** were tried by eye during development. With on-model garment photos the
+provider copied the model's face and accessories (shemagh, sunglasses) onto the user, so the
+catalogue was switched to product-only flat-lay / ghost-mannequin photos. Timings, credits and a
+structured quality review are still **not recorded** (see "Not verified: steps to finish AI
+validation" below).
+
 ## AI photo mode (branch `development`, 2026-09-27)
 
 Same machine and browser. Node 24.19.0. New packages (exact versions in `package-lock.json`): fashn

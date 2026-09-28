@@ -85,7 +85,7 @@ export const VNECK_3D: Garment3DDefinition = {
   description: 'V-neck shirt with rolled sleeves — rigged 3D model',
   preview: 'garments/3d/vneck/preview.png',
   model: 'garments/3d/vneck/shirt-male.glb',
-  variant: 'Male source model (SM_Shirt_01_man); no female variant has been converted',
+  variant: 'Male source model (SM_Shirt_01_man), Fab conversion',
   rig: VNECK_RIG,
   materials: FABRIC_COLOURS,
   defaultMaterialId: 'stone',

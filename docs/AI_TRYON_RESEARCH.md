@@ -63,3 +63,15 @@ Results can still alter identity, body shape, text/logos, or garment details. Te
 5. Test the real camera/touchscreen and several garment types. Keep the existing live modes working throughout.
 
 The complete implementation instructions are in [CLAUDE_AI_TRYON_PROMPT.md](CLAUDE_AI_TRYON_PROMPT.md).
+
+## What changed after implementation (2026-09-28)
+
+- **Garment photos must not show a person.** In real generations, on-model stock photos let the
+  provider copy the model's face and accessories (shemagh, sunglasses) onto the user. The catalogue
+  now uses only flat-lay or ghost-mannequin product photos (`assets/garments/ai/SOURCE.md`).
+- **Online as well as on the kiosk.** The same backend also runs as a Vercel Function, with shared
+  state in Upstash Redis and an access code protecting the operator's key (README, "Deploying to
+  Vercel").
+- **Visitor keys.** A visitor may use their own FASHN key, kept in their browser and sent only with
+  their own requests (`AI_USER_KEYS`; turn it off on a shared kiosk). The browser still talks only
+  to its own origin; the server forwards the key to FASHN and never stores it.
