@@ -269,8 +269,56 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  /* The native bar takes width as it comes and goes, shifting the content; OverlayScrollbar draws one
+     over the edge instead. */
+  scrollbar-width: none;
+}
+
+.panel-body::-webkit-scrollbar {
+  display: none;
+}
+
+.panel-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Overlay scrollbar (components/ui/OverlayScrollbar.tsx) */
+.overlay-scrollbar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  inset-inline-end: 1px;
+  width: 10px;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.overlay-scrollbar[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay-scrollbar-thumb {
+  width: 6px;
+  margin-inline: auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  touch-action: none;
+  transition:
+    background 0.15s ease,
+    width 0.15s ease;
+}
+
+.overlay-scrollbar:hover .overlay-scrollbar-thumb,
+.overlay-scrollbar[data-dragging] .overlay-scrollbar-thumb {
+  width: 8px;
+  background: rgba(255, 255, 255, 0.34);
 }
 
 /* The folded rail (wide screens) */

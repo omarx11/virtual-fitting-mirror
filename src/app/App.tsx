@@ -31,6 +31,7 @@ import { SourceControls } from '../components/SourceControls';
 import { StageOverlay } from '../components/StageOverlay';
 import { Transport } from '../components/Transport';
 import { TryOnModeSelector } from '../components/TryOnModeSelector';
+import { OverlayScrollbar } from '../components/ui/OverlayScrollbar';
 import { PanelSection } from '../components/ui/PanelSection';
 import { ToastViewport, useToasts } from '../components/ui/Toasts';
 import { ViewControls } from '../components/ViewControls';
@@ -76,6 +77,7 @@ export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appRef = useRef<HTMLDivElement>(null);
+  const panelBodyRef = useRef<HTMLDivElement>(null);
   const { m, toggleLocale } = useI18n();
   const [prefs, setPrefs] = useState<Preferences>(loadPreferences);
   const { engine, snapshot, initError } = useMirrorEngine(canvasRef, stageRef, prefs);
@@ -481,170 +483,173 @@ export function App() {
                     </div>
                   </header>
 
-                  {/* layoutScroll: the shirt ring's layout animation accounts for this scroll offset. */}
-                  <motion.div className="panel-body" layoutScroll>
-                    <div className="card mode-card">
-                      <TryOnModeSelector mode={prefs.tryOnMode} onChange={selectMode} />
-                    </div>
-                    {hasSource && (
-                      <PanelSection
-                        title={m.app.sections.source}
-                        icon={<Video size={17} />}
-                        tone="blue"
-                        collapsed={prefs.collapsedSections.includes('source')}
-                        onToggle={() => toggleSection('source')}
-                        aside={
-                          liveSource && (
-                            <span className={liveSource.kind === 'camera' ? 'chip chip-live' : 'chip'}>
-                              {liveSource.kind === 'camera' ? m.app.live : m.app.video}
-                            </span>
-                          )
-                        }
-                      >
-                        <SourceControls
-                          compact
-                          status={snapshot.source}
-                          onOpenFile={(file) => void engine.openFile(file)}
-                          onOpenCamera={(id) => void engine.openCamera(id)}
-                        />
-                        {isFile && <Transport engine={engine} playback={snapshot.playback} />}
-                      </PanelSection>
-                    )}
-                    {aiActive && controller ? (
-                      <PanelSection
-                        title={m.app.sections.ai}
-                        icon={<Sparkles size={17} />}
-                        tone="teal"
-                        collapsed={prefs.collapsedSections.includes('garments')}
-                        onToggle={() => toggleSection('garments')}
-                      >
-                        <AiTryOnPanel
-                          state={ai}
-                          controller={controller}
-                          onSelectGarment={selectAiGarment}
-                          onPhotoFile={(file) => void openPhotoFile(file)}
-                          onEndSession={endSession}
-                        />
-                        {captureErrorText && (
-                          <p className="error-text" role="alert">
-                            {captureErrorText}
-                          </p>
-                        )}
-                      </PanelSection>
-                    ) : (
-                      <>
+                  <div className="panel-scroll">
+                    {/* layoutScroll: the shirt ring's layout animation accounts for this scroll offset. */}
+                    <motion.div ref={panelBodyRef} className="panel-body" layoutScroll>
+                      <div className="card mode-card">
+                        <TryOnModeSelector mode={prefs.tryOnMode} onChange={selectMode} />
+                      </div>
+                      {hasSource && (
                         <PanelSection
-                          title={m.app.sections.shirts}
-                          icon={<Shirt size={17} />}
-                          tone="pink"
+                          title={m.app.sections.source}
+                          icon={<Video size={17} />}
+                          tone="blue"
+                          collapsed={prefs.collapsedSections.includes('source')}
+                          onToggle={() => toggleSection('source')}
+                          aside={
+                            liveSource && (
+                              <span className={liveSource.kind === 'camera' ? 'chip chip-live' : 'chip'}>
+                                {liveSource.kind === 'camera' ? m.app.live : m.app.video}
+                              </span>
+                            )
+                          }
+                        >
+                          <SourceControls
+                            compact
+                            status={snapshot.source}
+                            onOpenFile={(file) => void engine.openFile(file)}
+                            onOpenCamera={(id) => void engine.openCamera(id)}
+                          />
+                          {isFile && <Transport engine={engine} playback={snapshot.playback} />}
+                        </PanelSection>
+                      )}
+                      {aiActive && controller ? (
+                        <PanelSection
+                          title={m.app.sections.ai}
+                          icon={<Sparkles size={17} />}
+                          tone="teal"
                           collapsed={prefs.collapsedSections.includes('garments')}
                           onToggle={() => toggleSection('garments')}
-                          aside={<span className="chip">{selectedGarment.kind.toUpperCase()}</span>}
                         >
-                          <GarmentPicker
-                            kind={selectedGarment.kind}
-                            garments={GARMENTS}
-                            selectedId={prefs.garmentId}
-                            onSelect={selectLiveGarment}
-                            materialId={prefs.materialId}
-                            onMaterial={(id) => update({ materialId: id })}
-                            status3d={snapshot.garment3d}
-                            onRetry3d={() => engine.retryGarment()}
+                          <AiTryOnPanel
+                            state={ai}
+                            controller={controller}
+                            onSelectGarment={selectAiGarment}
+                            onPhotoFile={(file) => void openPhotoFile(file)}
+                            onEndSession={endSession}
                           />
-                          {snapshot.garmentError && (
+                          {captureErrorText && (
                             <p className="error-text" role="alert">
-                              {m.garments.imageError(snapshot.garmentError)}
+                              {captureErrorText}
                             </p>
                           )}
                         </PanelSection>
-                        <PanelSection
-                          title={m.app.sections.fit}
-                          icon={<Ruler size={17} />}
-                          tone="amber"
-                          collapsed={prefs.collapsedSections.includes('fit')}
-                          onToggle={() => toggleSection('fit')}
-                        >
-                          <FitControls fit={prefs.fit} onChange={(fit) => update({ fit })} />
-                        </PanelSection>
-                      </>
-                    )}
-                    <PanelSection
-                      title={m.app.sections.view}
-                      icon={<Eye size={17} />}
-                      tone="violet"
-                      collapsed={prefs.collapsedSections.includes('view')}
-                      onToggle={() => toggleSection('view')}
-                    >
-                      <ViewControls
-                        showGarment={prefs.showGarment}
-                        mirror={prefs.mirror}
-                        occlusion={prefs.occlusion}
-                        fabricMotion={
-                          selectedGarment.kind === '3d' && selectedGarment.simulation
-                            ? prefs.motion === 'cloth'
-                            : null
-                        }
-                        fullscreen={fullscreen}
-                        fitMode={prefs.fitMode}
-                        garmentToggles={!aiActive}
-                        onToggleGarment={() => update({ showGarment: !prefs.showGarment })}
-                        onToggleMirror={() => update({ mirror: !prefs.mirror })}
-                        onToggleOcclusion={() => update({ occlusion: !prefs.occlusion })}
-                        onToggleFabricMotion={() =>
-                          update({ motion: prefs.motion === 'cloth' ? 'skeletal' : 'cloth' })
-                        }
-                        onToggleFullscreen={toggleFullscreen}
-                        onToggleFitMode={() =>
-                          update({ fitMode: prefs.fitMode === 'contain' ? 'cover' : 'contain' })
-                        }
-                      />
-                    </PanelSection>
-                    <section className="card" data-tone="blue">
-                      <DiagnosticsPanel
-                        snapshot={snapshot}
-                        open={prefs.diagnosticsOpen}
-                        onToggleOpen={(open) =>
-                          open !== prefs.diagnosticsOpen && update({ diagnosticsOpen: open })
-                        }
-                        showLandmarks={prefs.showLandmarks}
-                        onToggleLandmarks={() => update({ showLandmarks: !prefs.showLandmarks })}
-                        preset={prefs.preset}
-                        onPreset={(preset) => update({ preset })}
-                        delegate={prefs.delegate}
-                        onDelegate={(delegate) => update({ delegate })}
-                        tuning={engine.getClothTuning()}
-                        onTuning={(patch) => engine.setClothTuning(patch)}
-                        showRig={showRig}
-                        ai={aiActive ? ai : null}
-                        onAiPreset={(id) => controller?.setPreset(id)}
-                        {...(import.meta.env.DEV
-                          ? {
-                              onToggleRig: () => {
-                                engine.setDebugHelpers(!showRig);
-                                setShowRig(!showRig);
-                              },
-                            }
-                          : {})}
-                      />
-                    </section>
-                    <div className="privacy-note">
-                      <ShieldCheck aria-hidden size={18} />
-                      <p>
-                        {aiActive ? m.app.privacyAi : m.app.privacyLive}{' '}
-                        <a className="text-button" href="/research">
-                          {m.app.learnMore}
-                        </a>{' '}
-                        <button
-                          type="button"
-                          className="text-button keyboard-only"
-                          onClick={() => setDialog('shortcuts')}
-                        >
-                          {m.common.keyboardShortcuts}
-                        </button>
-                      </p>
-                    </div>
-                    <CreditsCard onOpenAbout={() => setDialog('about')} />
-                  </motion.div>
+                      ) : (
+                        <>
+                          <PanelSection
+                            title={m.app.sections.shirts}
+                            icon={<Shirt size={17} />}
+                            tone="pink"
+                            collapsed={prefs.collapsedSections.includes('garments')}
+                            onToggle={() => toggleSection('garments')}
+                            aside={<span className="chip">{selectedGarment.kind.toUpperCase()}</span>}
+                          >
+                            <GarmentPicker
+                              kind={selectedGarment.kind}
+                              garments={GARMENTS}
+                              selectedId={prefs.garmentId}
+                              onSelect={selectLiveGarment}
+                              materialId={prefs.materialId}
+                              onMaterial={(id) => update({ materialId: id })}
+                              status3d={snapshot.garment3d}
+                              onRetry3d={() => engine.retryGarment()}
+                            />
+                            {snapshot.garmentError && (
+                              <p className="error-text" role="alert">
+                                {m.garments.imageError(snapshot.garmentError)}
+                              </p>
+                            )}
+                          </PanelSection>
+                          <PanelSection
+                            title={m.app.sections.fit}
+                            icon={<Ruler size={17} />}
+                            tone="amber"
+                            collapsed={prefs.collapsedSections.includes('fit')}
+                            onToggle={() => toggleSection('fit')}
+                          >
+                            <FitControls fit={prefs.fit} onChange={(fit) => update({ fit })} />
+                          </PanelSection>
+                        </>
+                      )}
+                      <PanelSection
+                        title={m.app.sections.view}
+                        icon={<Eye size={17} />}
+                        tone="violet"
+                        collapsed={prefs.collapsedSections.includes('view')}
+                        onToggle={() => toggleSection('view')}
+                      >
+                        <ViewControls
+                          showGarment={prefs.showGarment}
+                          mirror={prefs.mirror}
+                          occlusion={prefs.occlusion}
+                          fabricMotion={
+                            selectedGarment.kind === '3d' && selectedGarment.simulation
+                              ? prefs.motion === 'cloth'
+                              : null
+                          }
+                          fullscreen={fullscreen}
+                          fitMode={prefs.fitMode}
+                          garmentToggles={!aiActive}
+                          onToggleGarment={() => update({ showGarment: !prefs.showGarment })}
+                          onToggleMirror={() => update({ mirror: !prefs.mirror })}
+                          onToggleOcclusion={() => update({ occlusion: !prefs.occlusion })}
+                          onToggleFabricMotion={() =>
+                            update({ motion: prefs.motion === 'cloth' ? 'skeletal' : 'cloth' })
+                          }
+                          onToggleFullscreen={toggleFullscreen}
+                          onToggleFitMode={() =>
+                            update({ fitMode: prefs.fitMode === 'contain' ? 'cover' : 'contain' })
+                          }
+                        />
+                      </PanelSection>
+                      <section className="card" data-tone="blue">
+                        <DiagnosticsPanel
+                          snapshot={snapshot}
+                          open={prefs.diagnosticsOpen}
+                          onToggleOpen={(open) =>
+                            open !== prefs.diagnosticsOpen && update({ diagnosticsOpen: open })
+                          }
+                          showLandmarks={prefs.showLandmarks}
+                          onToggleLandmarks={() => update({ showLandmarks: !prefs.showLandmarks })}
+                          preset={prefs.preset}
+                          onPreset={(preset) => update({ preset })}
+                          delegate={prefs.delegate}
+                          onDelegate={(delegate) => update({ delegate })}
+                          tuning={engine.getClothTuning()}
+                          onTuning={(patch) => engine.setClothTuning(patch)}
+                          showRig={showRig}
+                          ai={aiActive ? ai : null}
+                          onAiPreset={(id) => controller?.setPreset(id)}
+                          {...(import.meta.env.DEV
+                            ? {
+                                onToggleRig: () => {
+                                  engine.setDebugHelpers(!showRig);
+                                  setShowRig(!showRig);
+                                },
+                              }
+                            : {})}
+                        />
+                      </section>
+                      <div className="privacy-note">
+                        <ShieldCheck aria-hidden size={18} />
+                        <p>
+                          {aiActive ? m.app.privacyAi : m.app.privacyLive}{' '}
+                          <a className="text-button" href="/research">
+                            {m.app.learnMore}
+                          </a>{' '}
+                          <button
+                            type="button"
+                            className="text-button keyboard-only"
+                            onClick={() => setDialog('shortcuts')}
+                          >
+                            {m.common.keyboardShortcuts}
+                          </button>
+                        </p>
+                      </div>
+                      <CreditsCard onOpenAbout={() => setDialog('about')} />
+                    </motion.div>
+                    <OverlayScrollbar target={panelBodyRef} />
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
