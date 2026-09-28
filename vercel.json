@@ -5,6 +5,9 @@
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
   "regions": ["fra1"],
+  "git": {
+    "deploymentEnabled": { "**": false, "main": true }
+  },
   "functions": {
     "api/ai-gateway.js": {
       "maxDuration": 300,
