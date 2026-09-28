@@ -7,7 +7,6 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
-import fastifyStatic from '@fastify/static';
 import { Redis } from '@upstash/redis';
 import Fastify, { type FastifyError, type FastifyInstance, LogController } from 'fastify';
 import { AI_USER_KEY_HEADER } from '../src/ai/types';
@@ -184,6 +183,9 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
   const staticRoot =
     config.staticRoot && existsSync(join(config.staticRoot, 'index.html')) ? config.staticRoot : null;
   if (staticRoot) {
+    // Loaded lazily: on Vercel the CDN serves the frontend (staticRoot is null), and Vercel's function
+    // loader cannot require() the ESM-only content-disposition that @fastify/static pulls in.
+    const { default: fastifyStatic } = await import('@fastify/static');
     await app.register(fastifyStatic, { root: staticRoot, index: ['index.html'], wildcard: true });
   }
   app.setNotFoundHandler((req, reply) => {
