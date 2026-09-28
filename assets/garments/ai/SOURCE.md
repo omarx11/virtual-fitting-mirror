@@ -4,23 +4,24 @@ AI mode sends a **product photograph** of the garment to the try-on provider. Th
 `public/garments/ai/<id>/` (`product.jpg`, and a square 240 × 240 `preview.jpg` for the picker) and
 are built by `npm run generate:ai-garments` (`scripts/generate-ai-garments.mjs`).
 
-## Real garments (stock photos)
+## Real garments (product photos)
 
-Downloaded on 2026-09-28 and kept unmodified (1600 px wide) in `assets/garments/ai/photos/`. They
-show real garments worn by models; none of them is a product sold by this project. The Pexels and
-Unsplash licences allow free use and modification, including commercially, without attribution;
-credit is given anyway.
+Supplied by the project owner on 2026-09-28 as WebP product shots and kept unmodified in
+`assets/garments/ai/photos/<id>.webp`; the generator converts them to JPEG. Each shows the garment
+alone (flat-lay or ghost mannequin) with **no person**: on-model photos were dropped because the
+provider copied the model's face and accessories onto the user. None of them is a product sold by
+this project. **Their licence is not recorded here — confirm the right to use them before any
+public deployment** (see "Adding real shop products" below).
 
-| ID | Photo | Photographer | Licence | Category / photo type |
-| --- | --- | --- | --- | --- |
-| `dress-green` | [Woman in a Green Dress](https://www.pexels.com/photo/woman-in-a-green-dress-11046451/) | Vika Kirillova | [Pexels licence](https://www.pexels.com/license/) | one-pieces / on model |
-| `dress-purple` | [Elegant woman in a long, stylish purple dress](https://www.pexels.com/photo/elegant-woman-in-a-long-stylish-purple-dress-36414508/) | abubakar mamman | [Pexels licence](https://www.pexels.com/license/) | one-pieces / on model |
-| `thobe-white` | [Man in white thobe standing](https://unsplash.com/photos/I4B-IZ7cd-g) | Abdulrhman Alkhnaifer | [Unsplash licence](https://unsplash.com/license) | one-pieces / on model |
-| `fanila-white` | [Photo of a Man Wearing a White Tank Top](https://www.pexels.com/photo/photo-of-a-man-wearing-a-white-tank-top-15072827/) | Sharon Snider | [Pexels licence](https://www.pexels.com/license/) | tops / on model (cropped above the shorts) |
-
-Not found: an openly licensed photo of a Saudi **sirwal** (white drawstring trousers). Only the
-fanila (undershirt) half of the sirwal-and-fanila set is offered until a licensed photo exists; add it
-as `bottoms` following the steps below.
+| ID | Original file | For | Category / photo type |
+| --- | --- | --- | --- |
+| `dress-green-lace` | `AW3325s5.webp` | Women | one-pieces / flat-lay |
+| `dress-teal-floral` | `F48262s5.webp` | Women | one-pieces / flat-lay |
+| `dress-cream-botanical` | `H18491s5.webp` | Women | one-pieces / flat-lay |
+| `jumpsuit-navy-sequin` | `417010s5.webp` | Women | one-pieces / flat-lay |
+| `jumpsuit-black-dot` | `AJ6386s9.webp` | Women | one-pieces / flat-lay |
+| `thobe-white` | `1_org_zoom.webp` | Men | one-pieces / ghost mannequin (black backdrop) |
+| `thobe-gold-trim` | `H72370s7.webp` | Men | one-pieces / flat-lay |
 
 ## Demo renders
 
@@ -38,10 +39,11 @@ photograph.
 
 1. Use photos the shop owns or is licensed to use for this purpose. Do not assume demo or example
    images from vendors are licensed for deployment.
-2. Prefer a clear front **flat-lay** or **ghost-mannequin** photo showing the whole garment on a
-   plain background, or an on-model photo (then set `photoType: 'model'`).
-3. Put the photo at `public/garments/ai/<product-id>/product.jpg` (JPEG/PNG/WebP, under 8 MiB) and a
-   square `preview.jpg`.
+2. Use a clear front **flat-lay** or **ghost-mannequin** photo showing the whole garment on a
+   plain background, with no person in it (an on-model photo lets the provider copy the model's
+   face and accessories onto the user).
+3. Put the original at `assets/garments/ai/photos/<id>.webp`, add the ID to `PHOTOS` in
+   `scripts/generate-ai-garments.mjs` and run `npm run generate:ai-garments -- --photos-only`.
 4. Add an entry to `src/garments/aiCatalogue.ts` with the real `category`, `photoType`, provenance
    text, `demo: false`, and `liveGarmentId` if the same product exists in 2D/3D.
 5. Record the source and licence in this file.

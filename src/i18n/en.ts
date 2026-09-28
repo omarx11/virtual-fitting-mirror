@@ -36,8 +36,7 @@ export type ShortcutId =
 
 const RENDER_NOTE =
   'Synthetic render of the rigged 3D V-neck model (no fabric texture) — demo only, not a shop photo.';
-const PHOTO_NOTE = (site: string, photographer: string) =>
-  `Stock photo by ${photographer} (${site} licence) — a real garment, not a product sold here.`;
+const PRODUCT_NOTE = 'Product photo supplied by the project owner — a real garment, not a product sold here.';
 
 export const en = {
   meta: {
@@ -314,25 +313,40 @@ export const en = {
     },
     /** AI catalogue text by entry ID. */
     items: {
-      'dress-green': {
-        label: 'Green dress',
-        description: 'Long-sleeve ruched midi dress',
-        provenance: PHOTO_NOTE('Pexels', 'Vika Kirillova'),
+      'dress-green-lace': {
+        label: 'Green lace dress',
+        description: 'Women’s puff-sleeve lace dress',
+        provenance: PRODUCT_NOTE,
       },
-      'dress-purple': {
-        label: 'Purple gown',
-        description: 'Long gown with flared sleeves',
-        provenance: PHOTO_NOTE('Pexels', 'abubakar mamman'),
+      'dress-teal-floral': {
+        label: 'Teal floral dress',
+        description: 'Women’s floral wrap midi dress',
+        provenance: PRODUCT_NOTE,
+      },
+      'dress-cream-botanical': {
+        label: 'Cream botanical dress',
+        description: 'Women’s printed midi dress with gathered waist',
+        provenance: PRODUCT_NOTE,
+      },
+      'jumpsuit-navy-sequin': {
+        label: 'Navy sequin jumpsuit',
+        description: 'Women’s wrap jumpsuit with sequin top and tie belt',
+        provenance: PRODUCT_NOTE,
+      },
+      'jumpsuit-black-dot': {
+        label: 'Black polka-dot jumpsuit',
+        description: 'Women’s wide-leg jumpsuit with dotted mesh sleeves',
+        provenance: PRODUCT_NOTE,
       },
       'thobe-white': {
         label: 'Saudi thobe',
-        description: 'White men’s thobe',
-        provenance: PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
+        description: 'Men’s white collared thobe',
+        provenance: PRODUCT_NOTE,
       },
-      'fanila-white': {
-        label: 'Fanila',
-        description: 'White sleeveless undershirt',
-        provenance: PHOTO_NOTE('Pexels', 'Sharon Snider'),
+      'thobe-gold-trim': {
+        label: 'Gold-trim thobe',
+        description: 'Men’s white round-neck thobe with gold trim',
+        provenance: PRODUCT_NOTE,
       },
       'vneck-stone': {
         label: 'V-neck · Stone',

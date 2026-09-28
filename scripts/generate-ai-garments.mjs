@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Generates the product photos used by AI mode (public/garments/ai/<id>/product.jpg + preview.jpg):
-//   - photos: real garments worn by models, from free-licence stock photos kept in
-//     assets/garments/ai/photos/ (sources and licences in assets/garments/ai/SOURCE.md);
+//   - photos: product-only shots of real garments (no person), kept in assets/garments/ai/photos/
+//     (sources in assets/garments/ai/SOURCE.md);
 //   - vneck-*: DEMO renders of the actual 3D V-neck model (neutral pose, one fabric colour each) via
 //     the development inspection view in Playwright's Chromium. The model has no fabric texture.
 // Real shop products need real, owner-provided photos (see assets/garments/ai/SOURCE.md).
@@ -46,36 +46,38 @@ async function writeProduct(id, input) {
 }
 
 /**
- * On-model stock photos. `keep` trims the photo to the garment being offered (fractions of the
- * height, e.g. the fanila photo stops above the model's shorts); `focus` is the vertical centre of
- * the square picker thumbnail, as a fraction of the kept height.
+ * Product-only photos (flat-lay / ghost mannequin, no person), kept as supplied (WebP) in
+ * assets/garments/ai/photos/<id>.webp and converted to JPEG here.
  */
 const PHOTOS = [
-  { id: 'dress-green', focus: 0.47 },
-  { id: 'dress-purple', focus: 0.45 },
-  { id: 'thobe-white', focus: 0.5 },
-  { id: 'fanila-white', focus: 0.42, keep: [0, 0.66] },
+  'dress-green-lace',
+  'dress-teal-floral',
+  'dress-cream-botanical',
+  'jumpsuit-navy-sequin',
+  'jumpsuit-black-dot',
+  'thobe-white',
+  'thobe-gold-trim',
 ];
 const PHOTO_LONG_SIDE = 1400;
 
-for (const { id, focus, keep = [0, 1] } of PHOTOS) {
-  const source = join(root, 'assets', 'garments', 'ai', 'photos', `${id}.jpg`);
-  const { width, height } = await sharp(source).metadata();
-  const top = Math.round(height * keep[0]);
-  const kept = Math.round(height * (keep[1] - keep[0]));
+for (const id of PHOTOS) {
+  const source = join(root, 'assets', 'garments', 'ai', 'photos', `${id}.webp`);
   const dir = join(outRoot, id);
   mkdirSync(dir, { recursive: true });
-  const trimmed = await sharp(source).rotate().extract({ left: 0, top, width, height: kept }).toBuffer();
-  await sharp(trimmed)
+  // The photo's own backdrop colour (top-left corner) pads the square thumbnail.
+  const corner = await sharp(source).extract({ left: 2, top: 2, width: 1, height: 1 }).raw().toBuffer();
+  const backdrop = { r: corner[0], g: corner[1], b: corner[2] };
+  await sharp(source)
+    .rotate()
+    .flatten({ background: backdrop })
     .resize(PHOTO_LONG_SIDE, PHOTO_LONG_SIDE, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 88, mozjpeg: true })
     .toFile(join(dir, 'product.jpg'));
-  // Square thumbnail across the garment: full width, centred on `focus`.
-  const side = Math.min(width, kept);
-  const y = Math.max(0, Math.min(kept - side, Math.round(kept * focus - side / 2)));
-  await sharp(trimmed)
-    .extract({ left: Math.round((width - side) / 2), top: y, width: side, height: side })
-    .resize(PREVIEW, PREVIEW)
+  // Whole garment in the square thumbnail.
+  await sharp(source)
+    .rotate()
+    .flatten({ background: backdrop })
+    .resize(PREVIEW, PREVIEW, { fit: 'contain', background: backdrop })
     .jpeg({ quality: 85, mozjpeg: true })
     .toFile(join(dir, 'preview.jpg'));
   console.log(`[ai-garments] wrote ${id}`);

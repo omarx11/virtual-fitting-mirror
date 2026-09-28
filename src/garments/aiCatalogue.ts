@@ -6,7 +6,8 @@
  * This module is plain data (no DOM, no Node): the backend imports it to resolve catalogue IDs to an
  * allowlisted image file, so the browser can never name an arbitrary path.
  *
- * The dresses, thobe and fanila are real garments worn by models in free-licence stock photos; the
+ * The dresses, jumpsuits and thobes are real garments in product-only photos with NO person in them
+ * (an on-model photo lets the provider copy the model's face and accessories onto the user); the
  * V-necks are DEMO renders of the 3D model (sources in assets/garments/ai/SOURCE.md). Colour variants
  * need their own photo: changing a 3D material does not change an AI product photograph.
  */
@@ -35,8 +36,7 @@ export interface AiGarmentDefinition {
 
 const RENDER_NOTE =
   'Synthetic render of the rigged 3D V-neck model (no fabric texture) — demo only, not a shop photo.';
-const PHOTO_NOTE = (site: string, photographer: string) =>
-  `Stock photo by ${photographer} (${site} licence) — a real garment, not a product sold here.`;
+const PRODUCT_NOTE = 'Product photo supplied by the project owner — a real garment, not a product sold here.';
 
 type EntryOptions = Pick<AiGarmentDefinition, 'category' | 'photoType' | 'demo' | 'liveGarmentId'>;
 
@@ -62,59 +62,81 @@ function entry(
   };
 }
 
-/** A real garment worn by a model in a stock photo. */
-const ON_MODEL = { photoType: 'model', demo: false, liveGarmentId: null } as const;
+/** A real one-piece garment in a product-only photo (flat-lay / ghost mannequin, no person). */
+const ONE_PIECE = {
+  category: 'one-pieces',
+  photoType: 'flat-lay',
+  demo: false,
+  liveGarmentId: null,
+} as const;
 /** A render of the live 3D V-neck. */
 const VNECK = { category: 'tops', photoType: 'flat-lay', demo: true, liveGarmentId: 'vneck-3d' } as const;
 
 export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
+  // Women's
   entry(
-    'dress-green',
-    'dress-green',
+    'dress-green-lace',
+    'dress-lace',
     'green',
-    'Green dress',
-    'Long-sleeve ruched midi dress',
-    PHOTO_NOTE('Pexels', 'Vika Kirillova'),
-    {
-      ...ON_MODEL,
-      category: 'one-pieces',
-    },
+    'Green lace dress',
+    'Women’s puff-sleeve lace dress',
+    PRODUCT_NOTE,
+    ONE_PIECE,
   ),
   entry(
-    'dress-purple',
-    'dress-purple',
-    'purple',
-    'Purple gown',
-    'Long gown with flared sleeves',
-    PHOTO_NOTE('Pexels', 'abubakar mamman'),
-    {
-      ...ON_MODEL,
-      category: 'one-pieces',
-    },
+    'dress-teal-floral',
+    'dress-wrap',
+    'teal-floral',
+    'Teal floral dress',
+    'Women’s floral wrap midi dress',
+    PRODUCT_NOTE,
+    ONE_PIECE,
   ),
+  entry(
+    'dress-cream-botanical',
+    'dress-midi',
+    'cream-botanical',
+    'Cream botanical dress',
+    'Women’s printed midi dress with gathered waist',
+    PRODUCT_NOTE,
+    ONE_PIECE,
+  ),
+  entry(
+    'jumpsuit-navy-sequin',
+    'jumpsuit-sequin',
+    'navy',
+    'Navy sequin jumpsuit',
+    'Women’s wrap jumpsuit with sequin top and tie belt',
+    PRODUCT_NOTE,
+    ONE_PIECE,
+  ),
+  entry(
+    'jumpsuit-black-dot',
+    'jumpsuit-mesh',
+    'black-dot',
+    'Black polka-dot jumpsuit',
+    'Women’s wide-leg jumpsuit with dotted mesh sleeves',
+    PRODUCT_NOTE,
+    ONE_PIECE,
+  ),
+  // Men's
   entry(
     'thobe-white',
     'thobe',
     'white',
     'Saudi thobe',
-    'White men’s thobe',
-    PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
-    {
-      ...ON_MODEL,
-      category: 'one-pieces',
-    },
+    'Men’s white collared thobe',
+    PRODUCT_NOTE,
+    ONE_PIECE,
   ),
   entry(
-    'fanila-white',
-    'fanila',
-    'white',
-    'Fanila',
-    'White sleeveless undershirt',
-    PHOTO_NOTE('Pexels', 'Sharon Snider'),
-    {
-      ...ON_MODEL,
-      category: 'tops',
-    },
+    'thobe-gold-trim',
+    'thobe-round-neck',
+    'white-gold',
+    'Gold-trim thobe',
+    'Men’s white round-neck thobe with gold trim',
+    PRODUCT_NOTE,
+    ONE_PIECE,
   ),
   entry('vneck-stone', 'vneck', 'stone', 'V-neck · Stone', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),
   entry('vneck-navy', 'vneck', 'navy', 'V-neck · Navy', 'Rolled-sleeve V-neck', RENDER_NOTE, VNECK),

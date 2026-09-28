@@ -14,8 +14,7 @@ import type { AccentText, Messages } from './en';
 
 const RENDER_NOTE =
   'صورة مولّدة من نموذج القميص ثلاثي الأبعاد (بدون نقشة القماش) — للعرض فقط، مو صورة منتج من المتجر.';
-const PHOTO_NOTE = (site: string, photographer: string) =>
-  `صورة من ${site} للمصوّر ${photographer} — قطعة حقيقية، مو منتج نبيعه هنا.`;
+const PRODUCT_NOTE = 'صورة منتج من صاحب المشروع — قطعة حقيقية، مو منتج نبيعه هنا.';
 
 const TRACKER_ERRORS: Record<InitErrorKind, string> = {
   'model-missing': `ملف نموذج التتبّع غير موجود على هذا الجهاز. شغّل الأمر ${ltr('npm run setup:assets')} ثم أعد تحميل الصفحة.`,
@@ -339,25 +338,40 @@ export const ar: Messages = {
       convert: 'ما قدرنا نحوّل الصورة.',
     },
     items: {
-      'dress-green': {
-        label: 'فستان أخضر',
-        description: 'فستان ميدي بأكمام طويلة',
-        provenance: PHOTO_NOTE('Pexels', 'Vika Kirillova'),
+      'dress-green-lace': {
+        label: 'فستان دانتيل أخضر',
+        description: 'فستان نسائي دانتيل بأكمام منفوخة',
+        provenance: PRODUCT_NOTE,
       },
-      'dress-purple': {
-        label: 'فستان بنفسجي طويل',
-        description: 'فستان طويل بأكمام واسعة',
-        provenance: PHOTO_NOTE('Pexels', 'abubakar mamman'),
+      'dress-teal-floral': {
+        label: 'فستان فيروزي مورّد',
+        description: 'فستان نسائي ميدي ملفوف بنقشة ورد',
+        provenance: PRODUCT_NOTE,
+      },
+      'dress-cream-botanical': {
+        label: 'فستان كريمي بنقشة نباتية',
+        description: 'فستان نسائي ميدي مطبوع بخصر مكشكش',
+        provenance: PRODUCT_NOTE,
+      },
+      'jumpsuit-navy-sequin': {
+        label: 'جمبسوت كحلي بالترتر',
+        description: 'جمبسوت نسائي بصدر ملفوف مطرّز بالترتر وحزام',
+        provenance: PRODUCT_NOTE,
+      },
+      'jumpsuit-black-dot': {
+        label: 'جمبسوت أسود منقّط',
+        description: 'جمبسوت نسائي واسع بأكمام شبك منقّطة',
+        provenance: PRODUCT_NOTE,
       },
       'thobe-white': {
         label: 'ثوب سعودي',
-        description: 'ثوب رجالي أبيض',
-        provenance: PHOTO_NOTE('Unsplash', 'Abdulrhman Alkhnaifer'),
+        description: 'ثوب رجالي أبيض بياقة',
+        provenance: PRODUCT_NOTE,
       },
-      'fanila-white': {
-        label: 'فنيلة',
-        description: 'فنيلة بيضاء بدون أكمام',
-        provenance: PHOTO_NOTE('Pexels', 'Sharon Snider'),
+      'thobe-gold-trim': {
+        label: 'ثوب بحواف ذهبية',
+        description: 'ثوب رجالي أبيض بياقة دائرية وحواف ذهبية',
+        provenance: PRODUCT_NOTE,
       },
       'vneck-stone': { label: 'ياقة V · حجري', description: 'ياقة V بأكمام مرفوعة', provenance: RENDER_NOTE },
       'vneck-navy': { label: 'ياقة V · كحلي', description: 'ياقة V بأكمام مرفوعة', provenance: RENDER_NOTE },
