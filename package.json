@@ -70,6 +70,11 @@
     "vite": "8.3.1",
     "vitest": "5.0.2"
   },
+  "overrides": {
+    "@donmccurdy/caporal": {
+      "glob": "13.0.6"
+    }
+  },
   "allowScripts": {
     "esbuild@0.28.2": true
   }

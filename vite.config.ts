@@ -88,6 +88,27 @@ function socialPreview(env: Record<string, string | undefined>): Plugin {
   };
 }
 
+/**
+ * jolt-physics' Emscripten loader has a Node-only branch (`await import('node:module')`, taken only
+ * when `process.versions.node` exists) that the browser never runs. Vite would externalize it with
+ * a "Module node:module has been externalized" warning; the build resolves it to this stub instead.
+ * Build only: Vitest runs Jolt in Node, where that branch does run.
+ */
+function joltNodeModuleStub(): Plugin {
+  const stubId = '\0jolt-node-module-stub';
+  return {
+    name: 'jolt-node-module-stub',
+    apply: 'build',
+    enforce: 'pre',
+    resolveId: (source, importer) =>
+      source === 'node:module' && importer?.includes('jolt-physics') ? stubId : null,
+    load: (id) =>
+      id === stubId
+        ? 'export function createRequire() { throw new Error("node:module is not available in the browser"); }'
+        : null,
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Only AI_PORT / AI_API_TARGET are read here (for the proxy). Secrets are never loaded into the
   // frontend: only VITE_-prefixed variables reach browser code, and none are used.
@@ -97,7 +118,7 @@ export default defineConfig(({ mode }) => {
   // header is kept (changeOrigin: false) so the backend's origin checks see the real page origin.
   const proxy = { '/api': { target: apiTarget, changeOrigin: false } };
   return {
-    plugins: [react(), apiOfflineFallback(apiTarget), socialPreview(env)],
+    plugins: [react(), apiOfflineFallback(apiTarget), socialPreview(env), joltNodeModuleStub()],
     server: { headers: securityHeaders, proxy },
     preview: { headers: securityHeaders, proxy },
     define: {
