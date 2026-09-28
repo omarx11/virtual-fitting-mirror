@@ -2,6 +2,7 @@ import { ImageUp, KeyRound, LogOut, TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useRef, useState } from 'react';
 import type { AiTryOnController, AiViewState } from '../ai/controller';
+import { AI_BACKEND_HOSTED } from '../ai/deployment';
 import { AI_USER_KEY_PATTERN, type AiGarmentCategory, type AiGarmentPhotoType } from '../ai/types';
 import { AI_GARMENTS } from '../garments/aiCatalogue';
 import { aiGarmentText } from '../i18n/catalogue';
@@ -142,8 +143,8 @@ export function AiTryOnPanel({
             <TriangleAlert aria-hidden size={16} /> <strong>{m.ai.unavailableTitle}</strong>{' '}
             {withCode(m.ai.unavailableReason(state.unavailable.reason, state.unavailable.cause))}
           </p>
-          {/* Setup steps are for the kiosk computer; an online build cannot be set up this way. */}
-          {state.unavailable.cause !== 'not-deployed' && (
+          {/* Kiosk setup steps; a hosted (Vercel) server is set up in the project settings instead. */}
+          {state.unavailable.cause !== 'not-deployed' && !AI_BACKEND_HOSTED && (
             <details>
               <summary>{m.ai.setup}</summary>
               <ol>

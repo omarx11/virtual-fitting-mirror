@@ -1,7 +1,7 @@
 /**
  * Vercel Function entry (bundled by `npm run build:vercel` into dist-vercel/vercel.js and exported
  * by api/ai-gateway.js). vercel.json rewrites /api/ai/<path> to this function, and Vercel passes
- * <path> on as the query parameter vfmPath; the request is then handed to the same Fastify app the kiosk runs, in process.
+ * <path> as the query parameter vfmPath (named in the rewrite destination); the request is then handed to the same Fastify app the kiosk runs, in process.
  *
  * - One app per function instance, built on its first request and reused (Fluid compute keeps
  *   instances warm and runs concurrent requests in one instance).

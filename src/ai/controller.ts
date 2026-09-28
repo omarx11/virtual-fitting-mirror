@@ -111,6 +111,8 @@ export interface AiControllerDeps {
   idleResetMs?: number;
   /** False for a build without the AI server: AI mode explains itself and never calls the API. */
   backendDeployed?: boolean;
+  /** True when the AI server is hosted (Vercel), not a local server staff can start. */
+  backendHosted?: boolean;
   pollIntervalMs?: number;
 }
 
@@ -214,13 +216,20 @@ export class AiTryOnController {
       });
     } catch (error) {
       if (epoch !== this.epoch || this.disposed) return;
-      const down = error instanceof AiApiError && error.code === 'network';
+      // Say what actually failed (status and server message), so the cause can be found.
+      const detail =
+        error instanceof AiApiError
+          ? `${error.status ? `HTTP ${error.status}: ` : ''}${error.message}`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      const down = error instanceof AiApiError && error.code === 'network' && !this.deps.backendHosted;
       this.set({
         phase: 'unconfigured',
         unavailable: {
           reason: down
             ? 'The local AI server is not running (start it with npm run dev, or npm start after a build).'
-            : 'The local AI server returned an error.',
+            : `The AI server could not be used (${detail}).`,
           cause: down ? 'backend-down' : 'disabled',
         },
       });

@@ -296,7 +296,7 @@ fake provider (access code → session → job → result → end session), plus
 
 Notes: Vercel deploys `main` to production and every other branch (e.g. `development`) as a
 preview; with Standard Protection (Settings → Deployment Protection), preview links need a Vercel
-login. Vercel builds with Node.js 24 (the `engines` range allows it). Leave Vercel Web Analytics and
+login. Vercel builds with Node.js 24: the `engines` range (`>=22.12.0 <25`) pins it to 24.x, so a new Node major is never picked up without a deliberate change. Leave Vercel Web Analytics and
 Speed Insights **off**: they contact Vercel from the page, which this app's privacy rules block.
 The free Hobby plan is for non-commercial use, which fits this graduation project; Upstash's free
 plan (256 MB, 500K commands a month) is far more than this app uses.

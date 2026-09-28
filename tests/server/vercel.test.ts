@@ -2,7 +2,7 @@
 // Vercel configuration (Redis store, access code, same-origin hosts, Secure cookies). The Redis
 // database is replaced by the in-memory store with the same interface; server instances share it.
 import { afterEach, describe, expect, it } from 'vitest';
-import { MemoryKv } from '../../server/ai/kv';
+import { type KvStore, MemoryKv } from '../../server/ai/kv';
 import { FakeProvider } from '../../server/ai/providers/fake';
 import { type BuiltApp, buildApp } from '../../server/app';
 import { ConfigError, loadConfig } from '../../server/config';
@@ -73,6 +73,7 @@ interface Body {
   id: string;
   status: string;
   enabled: boolean;
+  reason: string | null;
   access: { required: boolean; granted: boolean };
 }
 const read = (res: Response) => res.json() as Promise<Body>;
@@ -203,5 +204,35 @@ describe('Vercel Function handler', () => {
     const res = await handler(request('capabilities'));
     expect(res.status).toBe(503);
     expect((await read(res)).error.code).toBe('not-configured');
+  });
+});
+
+describe('Vercel: the Redis database is checked before AI is offered', () => {
+  it('reports a wrong or unreachable database up front, and recovers once it answers', async () => {
+    const base = new MemoryKv();
+    let reachable = false;
+    // Same store, but reporting as Redis and failing like a wrong token until `reachable`.
+    const redis = Object.assign(Object.create(base), {
+      kind: 'redis',
+      get: async (key: string) => {
+        if (!reachable) throw new Error('WRONGPASS invalid or missing auth token');
+        return base.get(key);
+      },
+    }) as KvStore;
+    const built = await buildApp(vercelConfig(), {
+      provider: new FakeProvider({ scenario: 'success', stepMs: 10 }),
+      kv: redis,
+    });
+    apps.push(built);
+    const handler = createHandler(async () => built);
+
+    const down = await read(await handler(request('capabilities')));
+    expect(down.enabled).toBe(false);
+    expect(down.reason).toMatch(/Redis database cannot be reached.*WRONGPASS/);
+
+    reachable = true;
+    const up = await read(await handler(request('capabilities')));
+    expect(up.enabled).toBe(true);
+    expect(up.reason).toBeNull();
   });
 });

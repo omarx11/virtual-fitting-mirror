@@ -12,7 +12,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/ai/:vfmPath*", "destination": "/api/ai-gateway" },
+    { "source": "/api/ai/:vfmPath*", "destination": "/api/ai-gateway?vfmPath=:vfmPath*" },
     { "source": "/research", "destination": "/index.html" },
     { "source": "/research/", "destination": "/index.html" }
   ],

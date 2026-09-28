@@ -109,7 +109,7 @@ class FakeClient implements AiClient {
   }
 }
 
-function setup(keyStore?: UserKeyStore) {
+function setup(keyStore?: UserKeyStore, options: { backendHosted?: boolean } = {}) {
   const client = new FakeClient();
   const timers: { fn: () => void; ms: number; id: number }[] = [];
   let nextId = 1;
@@ -137,6 +137,7 @@ function setup(keyStore?: UserKeyStore) {
     randomUUID: () => `00000000-0000-4000-8000-${String(++urlCount).padStart(12, '0')}`,
     pollIntervalMs: 1000,
     ...(keyStore ? { keyStore } : {}),
+    ...options,
   });
   /** Advances the clock and runs the timers that are due now (one round), then settles promises. */
   const tick = async (ms = 1000) => {
@@ -315,6 +316,28 @@ describe("AI controller: the visitor's own API key", () => {
     expect(t.client.userKey).toBeNull();
     expect(t.controller.getState().userKey.saved).toBe(false);
     expect(await t.controller.saveUserKey('fa-good-key-123')).toBe(false);
+  });
+});
+
+describe('AI controller: server errors say what failed', () => {
+  it('shows the status and the server message instead of a generic error', async () => {
+    const t = setup();
+    t.client.caps = new AiApiError('not-found', 404, 'Unknown API route.');
+    await t.controller.activate();
+    expect(t.controller.getState().unavailable).toMatchObject({
+      cause: 'disabled',
+      reason: expect.stringContaining('HTTP 404: Unknown API route.'),
+    });
+  });
+
+  it('never tells visitors of the hosted site to start a local server', async () => {
+    const t = setup(undefined, { backendHosted: true });
+    t.client.caps = new AiApiError('network', 504, 'The AI service on this device is not running.');
+    await t.controller.activate();
+    const unavailable = t.controller.getState().unavailable;
+    expect(unavailable?.cause).toBe('disabled');
+    expect(unavailable?.reason).toContain('HTTP 504');
+    expect(unavailable?.reason).not.toMatch(/npm run dev|local/);
   });
 });
 

@@ -60,6 +60,8 @@ export interface AiServices {
   /** Provider paid by a visitor's own API key. */
   userProvider: (apiKey: string) => TryOnProvider;
   providerName: 'fashn' | 'fake';
+  /** Why the shared store (Redis) cannot be used right now, or null (see storeHealthCheck). */
+  storeHealth: () => Promise<string | null>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -78,9 +80,9 @@ export function unavailableReason(s: AiServices): string | null {
   return ai.unavailableReason ?? (ai.userKeys ? null : serverKeyReason(s));
 }
 
-export function capabilities(s: AiServices, cookieHeader?: string): AiCapabilities {
+export async function capabilities(s: AiServices, cookieHeader?: string): Promise<AiCapabilities> {
   const { ai } = s.config;
-  const reason = unavailableReason(s);
+  const reason = unavailableReason(s) ?? (await s.storeHealth());
   return {
     enabled: reason === null,
     reason,

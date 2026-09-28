@@ -15,7 +15,7 @@ import { AccessGate } from './ai/access';
 import { CatalogueStore } from './ai/catalogue';
 import { AppError } from './ai/errors';
 import { JobManager } from './ai/jobs';
-import { type KvStore, MemoryKv, RedisKv } from './ai/kv';
+import { type KvStore, MemoryKv, RedisKv, storeHealthCheck } from './ai/kv';
 import { FileLedger, KvLedger, type UsageLedger } from './ai/ledger';
 import { FakeProvider } from './ai/providers/fake';
 import { FashnProvider } from './ai/providers/fashn';
@@ -131,6 +131,7 @@ export async function buildApp(config: ServerConfig, overrides: AppOverrides = {
     provider,
     userProvider,
     providerName: provider.name,
+    storeHealth: storeHealthCheck(kv),
   };
 
   app.addHook('onSend', async (req, reply, payload) => {

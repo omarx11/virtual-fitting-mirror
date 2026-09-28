@@ -262,6 +262,37 @@ export class RedisKv implements KvStore {
   }
 }
 
+// ---- Health -----------------------------------------------------------------------------------------
+
+/**
+ * Checks that the store answers, so AI mode reports a wrong or unreachable Redis database up front
+ * instead of failing at the first generation. A good answer is remembered for `okForMs`; a failure
+ * is checked again on the next call. Returns why the store cannot be used, or null.
+ */
+export function storeHealthCheck(kv: KvStore, { timeoutMs = 4000, okForMs = 60_000 } = {}) {
+  if (kv.kind === 'memory') return async (): Promise<string | null> => null;
+  let okUntil = 0;
+  return async (): Promise<string | null> => {
+    if (Date.now() < okUntil) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        kv.get('health'),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`no answer within ${timeoutMs / 1000} s`)), timeoutMs);
+        }),
+      ]);
+      okUntil = Date.now() + okForMs;
+      return null;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      return `The Redis database cannot be reached (${detail.slice(0, 160)}). Check that Upstash for Redis is connected to this Vercel project, then redeploy.`;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 // ---- Locks ------------------------------------------------------------------------------------------
 
 export function token(): string {

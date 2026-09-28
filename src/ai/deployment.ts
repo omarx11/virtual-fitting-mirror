@@ -6,3 +6,6 @@
  * never calls the API. Every other build (`npm run dev`, `npm run build` + `npm start`) has the server.
  */
 export const AI_BACKEND_DEPLOYED = import.meta.env.MODE !== 'static';
+
+/** The AI server is a hosted Vercel Function (`npm run build:vercel` builds with `--mode vercel`). */
+export const AI_BACKEND_HOSTED = import.meta.env.MODE === 'vercel';

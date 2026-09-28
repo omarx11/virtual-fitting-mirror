@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createHttpAiClient } from './client';
 import { AiTryOnController, type AiViewState, INITIAL_AI_STATE } from './controller';
-import { AI_BACKEND_DEPLOYED } from './deployment';
+import { AI_BACKEND_DEPLOYED, AI_BACKEND_HOSTED } from './deployment';
 import { createBrowserKeyStore } from './userKey';
 
 /** A customer's photos, results and opt-in are forgotten after this long without interaction. */
@@ -28,6 +28,7 @@ export function useAiTryOn(active: boolean): { state: AiViewState; controller: A
       keyStore: createBrowserKeyStore(),
       idleResetMs: AI_IDLE_RESET_MS,
       backendDeployed: AI_BACKEND_DEPLOYED,
+      backendHosted: AI_BACKEND_HOSTED,
     });
     const unsubscribe = instance.subscribe(setState);
     setController(instance);
