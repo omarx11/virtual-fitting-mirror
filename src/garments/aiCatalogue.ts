@@ -90,11 +90,11 @@ const VNECK = {
 export const AI_GARMENTS: readonly AiGarmentDefinition[] = [
   // Women's
   entry(
-    'dress-green-lace',
-    'dress-lace',
-    'green',
-    'Green lace dress',
-    'Women’s puff-sleeve lace dress',
+    'dress-green-plaid',
+    'dress-plaid',
+    'green-pink',
+    'Green plaid dress',
+    'Women’s plaid maxi dress with a smocked waist',
     PRODUCT_NOTE,
     WOMENS,
   ),

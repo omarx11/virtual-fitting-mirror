@@ -6,7 +6,7 @@ are built by `npm run generate:ai-garments` (`scripts/generate-ai-garments.mjs`)
 
 ## Real garments (product photos)
 
-Supplied by the project owner on 2026-09-28 as WebP product shots and kept unmodified in
+Supplied by the project owner on 2026-09-28 (and `dress-green-plaid` on 2026-09-29) as WebP product shots and kept unmodified in
 `assets/garments/ai/photos/<id>.webp`; the generator converts them to JPEG. Each shows the garment
 alone (flat-lay or ghost mannequin) with **no person**: on-model photos were dropped because the
 provider copied the model's face and accessories onto the user. None of them is a product sold by
@@ -15,7 +15,7 @@ public deployment** (see "Adding real shop products" below).
 
 | ID | Original file | For | Category / photo type |
 | --- | --- | --- | --- |
-| `dress-green-lace` | `AW3325s5.webp` | Women | one-pieces / flat-lay |
+| `dress-green-plaid` | `Y40414s6.webp` | Women | one-pieces / flat-lay (on a hanger) |
 | `dress-teal-floral` | `F48262s5.webp` | Women | one-pieces / flat-lay |
 | `dress-cream-botanical` | `H18491s5.webp` | Women | one-pieces / flat-lay |
 | `jumpsuit-navy-sequin` | `417010s5.webp` | Women | one-pieces / flat-lay |

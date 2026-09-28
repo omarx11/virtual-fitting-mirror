@@ -345,9 +345,9 @@ export const ar: Messages = {
       convert: 'ما قدرنا نحوّل الصورة.',
     },
     items: {
-      'dress-green-lace': {
-        label: 'فستان دانتيل أخضر',
-        description: 'فستان نسائي دانتيل بأكمام منفوخة',
+      'dress-green-plaid': {
+        label: 'فستان كاروهات أخضر',
+        description: 'فستان نسائي طويل كاروهات بخصر مكشكش',
         provenance: PRODUCT_NOTE,
       },
       'dress-teal-floral': {

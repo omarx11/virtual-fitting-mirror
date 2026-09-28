@@ -50,7 +50,7 @@ async function writeProduct(id, input) {
  * assets/garments/ai/photos/<id>.webp and converted to JPEG here.
  */
 const PHOTOS = [
-  'dress-green-lace',
+  'dress-green-plaid',
   'dress-teal-floral',
   'dress-cream-botanical',
   'jumpsuit-navy-sequin',

@@ -321,9 +321,9 @@ export const en = {
     },
     /** AI catalogue text by entry ID. */
     items: {
-      'dress-green-lace': {
-        label: 'Green lace dress',
-        description: 'Women’s puff-sleeve lace dress',
+      'dress-green-plaid': {
+        label: 'Green plaid dress',
+        description: 'Women’s plaid maxi dress with a smocked waist',
         provenance: PRODUCT_NOTE,
       },
       'dress-teal-floral': {
